@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools==80.10.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insurance-operations-ai"
+version = "0.1.0"
+description = "Release 1 backend and worker foundation"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi==0.141.1",
+    "pydantic-settings==2.14.2",
+    "uvicorn==0.52.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx==0.28.1",
+    "mypy==2.3.0",
+    "pytest==9.1.1",
+    "ruff==0.16.1",
+]
+
+[project.scripts]
+insurance-operations-worker = "insurance_operations.worker:main"
+
+[tool.setuptools]
+package-dir = {"" = "apps/backend/src"}
+
+[tool.setuptools.packages.find]
+where = ["apps/backend/src"]
+
+[tool.setuptools.package-data]
+insurance_operations = ["py.typed"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["insurance_operations"]
+mypy_path = "apps/backend/src"
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-config --strict-markers"

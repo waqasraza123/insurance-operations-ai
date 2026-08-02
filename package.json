@@ -1,0 +1,30 @@
+{
+  "name": "insurance-operations-ai",
+  "private": true,
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "workspaces": [
+    "apps/web"
+  ],
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.25",
+      "sharp": "0.35.3"
+    }
+  },
+  "scripts": {
+    "build:web": "npm run build --workspace @insurance-operations/web",
+    "dev:web": "npm run dev --workspace @insurance-operations/web",
+    "format:web": "npm run format --workspace @insurance-operations/web",
+    "format:check:web": "npm run format:check --workspace @insurance-operations/web",
+    "lint:web": "npm run lint --workspace @insurance-operations/web",
+    "test:web": "npm run test --workspace @insurance-operations/web",
+    "typecheck:web": "npm run typecheck --workspace @insurance-operations/web",
+    "verify:web": "npm run format:check:web && npm run lint:web && npm run typecheck:web && npm run test:web && npm run build:web"
+  }
+}
