@@ -8,8 +8,11 @@ version = "0.1.0"
 description = "Release 1 backend and worker foundation"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "alembic>=1.18.0,<2",
     "fastapi==0.141.1",
     "pydantic-settings==2.14.2",
+    "psycopg[binary]>=3.3.2,<4",
+    "SQLAlchemy>=2.0.46,<2.1",
     "uvicorn==0.52.1",
 ]
 
@@ -23,6 +26,7 @@ dev = [
 
 [project.scripts]
 insurance-operations-worker = "insurance_operations.worker:main"
+insurance-operations-seed-development = "insurance_operations.database.seed:main"
 
 [tool.setuptools]
 package-dir = {"" = "apps/backend/src"}
@@ -39,6 +43,9 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["insurance_operations"]
 
 [tool.mypy]
 python_version = "3.13"
