@@ -1,69 +1,63 @@
 # Project State
 ## Product
-The product is an operations portfolio platform for small independent U.S. insurance agencies. By owner decision, browser-based Voice AI intake now precedes the Document AI flow. Voice Release 1A collects basic customer/contact details and intake intent with microphone consent, editable transcription, and explicit confirmation. It is not an agency management system, telephony system, quoting tool, coverage-verification service, or autonomous insurance agent.
+Insurance Operations AI is a portfolio platform for small independent U.S. insurance agencies. The owner moved browser Voice AI ahead of Document AI. Voice Release 1A is a development-only, synthetic-data, two-way intake demo that collects contact details and intent, then requires editable review and explicit confirmation. It is not telephony, quoting, advice, coverage verification, binding, underwriting, claims handling, or autonomous decision-making.
 
 ## Current Architecture
-The repository is a single coordinated codebase with three independently runnable identities: a Next.js TypeScript frontend, a FastAPI web service, and a separate Python worker process. FastAPI and worker share synchronous SQLAlchemy 2 and psycopg 3 connections for Neon PostgreSQL. Runtime traffic uses a bounded pooled URL; Alembic uses a direct, non-pooled migration connection. The initial schema contains agencies, application users, memberships, customers, audit events, and idempotency records. Task 005 adds asymmetric Supabase JWT verification, active user/membership/agency resolution, backend actor context, protected API routes, idempotent audited customer creation, and a minimal protected frontend shell; it is merged into `main`, and owner verification is pending.
+One repository contains a Next.js TypeScript frontend, FastAPI API, and separate Python worker. FastAPI and worker share SQLAlchemy 2 and psycopg 3 connections to Neon PostgreSQL; runtime uses bounded pooling and Alembic uses a direct connection. The database foundation contains agencies, application users, memberships, customers, audit events, idempotency records, generic conversation sessions, and immutable confirmed conversation intakes. Voice provider details are isolated in provider metadata plus backend/frontend ElevenLabs adapters. Development APIs resolve one deterministic active actor and agency without a production authentication system.
 
 ## Non-Negotiable Rules
-- Human approval is required before candidate data can affect approved policy data.
-- Source documents, extracted artifacts, candidate values, reviewer decisions, and approved versions remain distinct.
-- Approved policy versions are immutable, with explicit current-version selection.
-- Release 1 supports one agency context and English-language U.S. personal auto declaration-page PDFs only.
-- Backend rules, authorization, validation, idempotency, concurrency, cost limits, and audit behavior cannot be delegated to the browser.
-- Use synthetic data only during development and demonstrations; never commit secrets or real insurance customer data.
-- Provider choices for PDF parsing, OCR, and AI remain deferred until the controlled evaluation gate.
-- Microphone consent and explicit transcript confirmation are mandatory; draft transcripts and raw audio are not permanently retained in Voice Release 1A.
-- Voice intake cannot quote, advise, bind, verify coverage, or make autonomous insurance decisions.
-- Transcription provider selection requires separate owner approval after a controlled evaluation.
+- Neon PostgreSQL is the only database; no Supabase runtime or authentication code.
+- Backend rules, ownership, validation, idempotency, quotas, audit, and transaction boundaries are authoritative.
+- Voice use requires disclosure acceptance, microphone consent, synthetic-data acknowledgement, and explicit transcript confirmation.
+- Never retain raw audio; keep drafts in browser memory and persist transcript text only after confirmation.
+- Voice AI cannot quote, advise, bind, verify coverage, recommend limits, or make autonomous decisions.
+- Use synthetic data only in development; never commit secrets or real customer data.
+- Keep provider-specific SDKs, credentials, request mapping, and metadata inside adapters.
+- Human approval remains mandatory before future Document AI candidates affect approved policy data.
 
 ## Current Roadmap
-Task 001 established repository guardrails and the three runtime identities. Tasks 002–003 added Neon connection handling and persistence; Task 004 verified that foundation against an isolated disposable Neon test database. The owner then approved Voice AI before Document AI. Task 005 defines Voice Release 1A and implements the authentication/minimal-customer prerequisite on `main`. Next are owner verification, provider-neutral Voice intake, controlled provider evaluation/integration, a polished Voice portfolio flow, then Document AI and remaining operations.
+Verified Neon foundation; Supabase removal and development actor; generic conversation foundation; ElevenLabs two-way Voice AI; confirmed intake and customer creation; Voice AI testing, privacy verification, polish, and portfolio demo; document upload and worker; Document AI evaluation and implementation; human review, approval, audit, and remaining features.
 
 ## Completed Major Slices
-- Task 001: repository memory system and minimal runnable foundation.
-- Tasks 002–004 database foundation: isolated Neon migration rebuild, 24 database tests, Alembic agreement, formatting, linting, and strict typing verified.
-- Task 005 Voice AI foundation: implementation merged into `main`; owner verification remains pending.
+- Task 001: repository memory and minimal frontend, API, and worker runtimes.
+- Tasks 002–004: verified Neon connection, migrations, six approved foundation tables, ownership, readiness, CI PostgreSQL, and development agency seed.
+- Task 005: prior authentication/customer prerequisite merged; its Supabase implementation is removed by the current owner decision.
+- Task 006 working branch: generic conversation persistence, deterministic development actor, ElevenLabs adapters, browser demo, confirmation transaction, focused tests, and setup documentation are implemented but not locally verified.
 
 ## Important Decisions
-- Use one Git repository while keeping frontend, API, and worker runtime responsibilities separate.
-- Use Next.js with TypeScript for the frontend and FastAPI with Python for server runtimes.
-- Use Node.js 22 and Python 3.13 for the foundation.
-- Use Neon PostgreSQL instead of Supabase PostgreSQL when database work is explicitly authorized.
-- Use SQLAlchemy 2 with psycopg 3 for shared synchronous web/worker persistence and Alembic for migration-only schema changes.
-- Use pooled Neon connections for runtime work, direct `NullPool` connections for migrations, and an isolated required test database.
-- Seed only one deterministic development agency; do not seed users, customers, or business workflows.
-- Before shared feature data exists, correct a flawed initial migration in place; after any shared application, use a forward-only migration.
-- Add nullable demo and future-resource identifiers in dependency order, then add their foreign keys only when the approved parent tables exist.
-- Use Document 6 section 67.1's full idempotency unique scope, including `actor_scope_type`; section 44's index summary abbreviates that scope.
-- Use Supabase Auth for identity and verify asymmetric JWT signatures, issuer, audience, expiry, issued-at time, and UUID subject in FastAPI; derive agency ownership only from an active backend-resolved membership.
-- Keep the protected frontend shell independent of a sign-in implementation; a future server-side flow must set its access-token cookie with HttpOnly, Secure, and SameSite protections.
-- Complete Voice AI before Document AI, but keep transcription providers, private storage, email, OCR, and other AI integrations deferred until their approval gates.
-- Avoid microservices, Redis, Kafka, Kubernetes, GraphQL, generalized workflow engines, and premature provider abstractions.
+- Use Next.js/TypeScript, FastAPI/Python 3.13, SQLAlchemy 2, psycopg 3, Alembic, and Neon PostgreSQL.
+- Use one repository with independently runnable web, API, and worker identities; avoid unnecessary monorepo tooling.
+- Seed one deterministic development agency, actor, and active membership only in development.
+- Use `conversation_sessions` and `conversation_intakes`; provider names never appear in business table or API names.
+- Use ElevenLabs two-way WebRTC with a server-minted short-lived token and server-only API key.
+- Limit each session to 180 seconds, each agency to one concurrent session, and each UTC day to ten authorizations.
+- Make confirmed intakes immutable and confirmation idempotent; customer, intake, audit, and session confirmation share one transaction.
+- Use a forward Alembic revision for conversation tables because the verified initial migration is an established baseline.
+- Keep production identity/authentication deferred to a separately approved specification.
 
 ## Deferred / Not Yet Implemented
-Owner verification of Task 005; Supabase sign-in, sign-out, refresh, recovery, and session-cookie issuance; customer listing, detail, update, archive, duplicate handling, and full UI; microphone capture; transcription and provider selection; confirmed-transcript persistence; telephony; private storage; document upload; remaining business tables; durable jobs; OCR; Document AI processing; review; approval; audit presentation; email; demo sessions; and deployment configuration.
+Production authentication, real customer use, complete customer management, telephony, raw-audio storage, provider fallback, uploads, Storage, durable jobs, Document AI, OCR, review/approval UI, email, deployment configuration, and remaining business tables.
 
 ## Risks / Watchouts
-- The approved PDFs name Supabase PostgreSQL; the later owner direction selecting Neon is authoritative for database hosting.
-- Task 004 database verification passed on 2026-08-02; frontend verification and live application workflow testing remain separate checks.
-- `demo_session_id` and audit references to not-yet-created domain tables intentionally have no foreign keys until those approved parent-table migrations exist.
-- If revision `20260802_0001` was already applied to shared data, do not apply the edited revision over it; create and review a forward correction migration instead.
-- Do not let foundation placeholders become unreviewed business or security decisions.
-- Do not finalize parser, OCR, model, input strategy, provider retries, cost ceilings, or quality claims before evaluation approval.
-- Preserve independently deployable web and worker behavior as shared backend code grows.
-- Supabase projects using legacy symmetric JWT signing are not supported by the Task 005 verifier; use the configured asymmetric JWKS contract or obtain owner approval for a different trusted verification mechanism.
-- The protected shell cannot establish a browser session until the separately scoped server-side Supabase sign-in flow sets the hardened access-token cookie.
-- Task 005 adds dependencies and code without local installation or verification, as required by the owner; treat the merged implementation as unverified until the listed checks pass.
+- Task 006 code and migration are intentionally unverified locally under the owner testing policy.
+- `package.json` adds the ElevenLabs React SDK; the lockfile must be regenerated and reviewed before `npm ci` can verify the web app.
+- Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.
+- Final disclosure language, provider region, voice, and language model still require owner approval before any public use.
+- Browser transcript callbacks can contain evolving recognition text; the UI de-duplicates adjacent updates and explicit review remains mandatory.
+- The development actor is deliberately not production authentication and the routes are hidden unless development-only flags and seed data agree.
+- Never run database downgrade/rebuild commands unless `TEST_DATABASE_URL` is confirmed disposable and isolated.
 
 ## Standard Verification
+- `npm install --package-lock-only --ignore-scripts --workspace @insurance-operations/web`
+- `npm ci`
 - `npm run verify:web`
-- `alembic upgrade head`
-- `alembic check`
 - `ruff format --check .`
 - `ruff check .`
 - `mypy apps/backend/src tests`
+- `APP_ENVIRONMENT=test alembic downgrade base`
+- `APP_ENVIRONMENT=test alembic upgrade head`
+- `APP_ENVIRONMENT=test alembic current`
+- `APP_ENVIRONMENT=test alembic check`
 - `APP_ENVIRONMENT=test pytest`
-- `pytest tests/test_authentication.py tests/test_api.py -vv`
-- `APP_ENVIRONMENT=test pytest tests/database/test_customer_api.py -vv`
 - `insurance-operations-worker --check`
+

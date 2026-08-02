@@ -1,7 +1,9 @@
 from enum import StrEnum
 from typing import Self
+from urllib.parse import urlsplit
+from uuid import UUID
 
-from pydantic import Field, HttpUrl, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -106,36 +108,75 @@ class DatabaseSettings(CommonSettings):
 class ApiSettings(DatabaseSettings):
     api_host: str = Field(min_length=1)
     api_port: int = Field(ge=1, le=65_535)
-    supabase_auth_issuer: HttpUrl
-    supabase_auth_audience: str = Field(default="authenticated", min_length=1)
-    supabase_auth_jwks_url: HttpUrl
-    auth_clock_skew_seconds: int = Field(default=30, ge=0, le=120)
+    web_origin: str = "http://localhost:3000"
     idempotency_retention_hours: int = Field(default=24, ge=1, le=168)
+    conversation_ai_enabled: bool = False
+    development_actor_user_id: UUID | None = None
+    conversation_max_duration_seconds: int = Field(default=180, ge=1, le=180)
+    conversation_daily_session_limit: int = Field(default=10, ge=1, le=10)
+    conversation_confirmation_window_minutes: int = Field(default=30, ge=5, le=60)
+    elevenlabs_api_key: SecretStr | None = None
+    elevenlabs_agent_id: str | None = Field(default=None, min_length=1, max_length=200)
+    elevenlabs_privacy_confirmed: bool = False
 
-    @field_validator("supabase_auth_audience")
+    @field_validator("web_origin")
     @classmethod
-    def validate_authentication_audience(cls, value: str) -> str:
+    def validate_web_origin(cls, value: str) -> str:
+        parsed_origin = urlsplit(value)
+        if (
+            parsed_origin.scheme not in {"http", "https"}
+            or parsed_origin.hostname is None
+            or parsed_origin.username is not None
+            or parsed_origin.password is not None
+            or parsed_origin.path not in {"", "/"}
+            or parsed_origin.query
+            or parsed_origin.fragment
+        ):
+            raise ValueError("WEB_ORIGIN must be an HTTP or HTTPS origin")
+        return value.rstrip("/")
+
+    @field_validator("elevenlabs_agent_id")
+    @classmethod
+    def normalize_agent_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized_value = value.strip()
         if not normalized_value:
-            raise ValueError("authentication audience cannot be empty")
+            raise ValueError("ELEVENLABS_AGENT_ID cannot be empty")
         return normalized_value
 
+    @field_validator("elevenlabs_api_key")
+    @classmethod
+    def normalize_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        return SecretStr(value.get_secret_value().strip())
+
     @model_validator(mode="after")
-    def validate_authentication_endpoints(self) -> Self:
-        if (
-            self.app_environment is RuntimeEnvironment.PRODUCTION
-            and (
-                self.supabase_auth_issuer.scheme != "https"
-                or self.supabase_auth_jwks_url.scheme != "https"
+    def validate_conversation_configuration(self) -> Self:
+        if not self.conversation_ai_enabled:
+            return self
+        if self.app_environment is not RuntimeEnvironment.DEVELOPMENT:
+            raise ValueError("conversation AI can be enabled only in development")
+        if self.development_actor_user_id is None:
+            raise ValueError(
+                "DEVELOPMENT_ACTOR_USER_ID is required when conversation AI is enabled"
             )
-        ):
-            raise ValueError("authentication endpoints must use HTTPS in production")
         if (
-            self.supabase_auth_issuer.scheme != self.supabase_auth_jwks_url.scheme
-            or self.supabase_auth_issuer.host != self.supabase_auth_jwks_url.host
-            or self.supabase_auth_issuer.port != self.supabase_auth_jwks_url.port
+            self.elevenlabs_api_key is None
+            or not self.elevenlabs_api_key.get_secret_value().strip()
         ):
-            raise ValueError("authentication issuer and JWKS URL must share an origin")
+            raise ValueError(
+                "ELEVENLABS_API_KEY is required when conversation AI is enabled"
+            )
+        if self.elevenlabs_agent_id is None:
+            raise ValueError(
+                "ELEVENLABS_AGENT_ID is required when conversation AI is enabled"
+            )
+        if not self.elevenlabs_privacy_confirmed:
+            raise ValueError(
+                "ElevenLabs audio saving and zero-day retention must be confirmed"
+            )
         return self
 
 

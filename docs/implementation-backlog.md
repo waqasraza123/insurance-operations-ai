@@ -2,12 +2,15 @@
 
 This owner-approved order puts browser Voice AI before Document AI while preserving the shared contracts in Documents 1, 4, 6, and 7.
 
-1. **Verified foundation** — Preserve the isolated Neon migration, constraint, connection, readiness, lint, typing, and test baseline.
-2. **Authentication and minimal customer foundation** — Verify Supabase token validation, backend actor and agency resolution, protected routes, idempotent customer creation, audit recording, and the protected shell implemented by Task 005.
-3. **Provider-neutral Voice AI intake** — Add consent, bounded browser capture, typed fallback, editable transcript, explicit confirmation, and confirmed-transcript persistence against `docs/voice-ai-release1a.md`, without selecting a provider.
-4. **Voice AI provider evaluation and integration** — Benchmark eligible transcription providers on synthetic representative audio, privacy, latency, accuracy, failure behavior, and cost; record owner approval before integrating one adapter.
-5. **Voice AI polished portfolio flow** — Complete accessible UX, interruption/retry states, usage limits, operational observability, and a synthetic end-to-end demonstration without telephony or autonomous insurance behavior.
-6. **Document AI foundation, evaluation, review, and approval** — Implement private PDF storage, durable processing, provider-neutral candidates, controlled evaluation, human review, immutable approval, and audit in dependency order.
-7. **Remaining operational features** — Add only separately approved policy, email, demo, deployment, and operational slices after the two portfolio flows have safe foundations.
+1. **Verified Neon foundation** — Preserve isolated migrations, connection safety, readiness, ownership, constraints, linting, typing, and tests.
+2. **Supabase removal and development actor** — Remove every Supabase runtime and UI dependency; use one deterministic active actor and agency only for synthetic development work.
+3. **Generic conversation foundation** — Add provider-neutral sessions, confirmed immutable intakes, consent, quotas, ownership, idempotency, audit, and transactional customer creation.
+4. **ElevenLabs two-way Voice AI** — Use browser WebRTC through an isolated adapter and a short-lived backend-minted token; keep the API key server-only and raw audio out of application storage.
+5. **Confirmed intake and customer creation** — Require editable review and explicit confirmation before atomically persisting the customer, immutable transcript intake, audit events, and session result.
+6. **Voice AI testing, privacy verification, polish, and portfolio demo** — Verify failure/retry paths, accessibility, browser behavior, provider retention settings, cost limits, and a synthetic demonstration.
+7. **Document upload and worker** — Add private PDF upload and durable worker execution only after Voice AI is verified.
+8. **Document AI evaluation and implementation** — Evaluate providers against approved fixtures before implementing extraction candidates.
+9. **Human review, approval, audit, and remaining features** — Preserve candidate/approved separation and add later operational slices only when approved.
 
-Each item must remain a reviewable vertical slice with focused tests, security boundaries, rollback notes, and owner verification. Provider selection must not be combined with capability-boundary implementation.
+Each item stays reviewable, uses synthetic data, and retains backend authority. Production authentication, telephony, provider fallback, and autonomous insurance behavior require separate specifications.
+
