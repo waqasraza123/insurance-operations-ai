@@ -33,6 +33,8 @@ The idempotent seed creates one development agency, deterministic synthetic acto
 
 Follow [the agent setup contract](docs/elevenlabs-agent-setup.md), then set the server-only `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, and privacy attestation. Enable both backend and public feature flags only for development:
 
+Keep both feature flags `false` until the owner completes the provider privacy and billing checklist. The owner must explicitly select the LLM, STT, TTS, and voice in ElevenLabs; the application does not silently select substitutes.
+
 ```dotenv
 APP_ENVIRONMENT=development
 CONVERSATION_AI_ENABLED=true

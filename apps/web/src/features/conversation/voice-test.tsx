@@ -394,9 +394,13 @@ function VoiceTestExperience({
           coverage, or make decisions.
         </p>
         <div className="disclosure" role="note">
-          Audio is processed live by ElevenLabs and configured model services.
-          This app does not retain raw audio. Nothing is saved until you review
-          and explicitly confirm the transcript and customer details.
+          You are interacting with an AI, not a human. Your microphone audio
+          and conversation are recorded during the session and may be shared
+          with ElevenLabs and third-party AI/LLM providers for processing. Use
+          fictional test data only—never real customer or sensitive
+          information. This app does not retain raw audio or a live draft
+          transcript. Intake details and transcript text are saved only after
+          you review and explicitly confirm them.
         </div>
         <label className="consent-row">
           <input
@@ -405,7 +409,8 @@ function VoiceTestExperience({
             onChange={(event) => setDisclosureAccepted(event.target.checked)}
             type="checkbox"
           />
-          I understand this is an AI intake assistant with the limits above.
+          I agree to the AI, recording, sharing, and provider-processing
+          disclosure above.
         </label>
         <label className="consent-row">
           <input
@@ -425,7 +430,8 @@ function VoiceTestExperience({
             }
             type="checkbox"
           />
-          I will use synthetic test details only, never real customer data.
+          I will use fictional test details only, never real customer or
+          sensitive data.
         </label>
         <div className="voice-actions">
           {canStart && (

@@ -22,7 +22,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 - Task 001: repository memory and minimal frontend, API, and worker runtimes.
 - Tasks 002–004: verified Neon connection, migrations, six approved foundation tables, ownership, readiness, CI PostgreSQL, and development agency seed.
 - Task 005: prior authentication/customer prerequisite merged; its Supabase implementation is removed by the current owner decision.
-- Task 006 working branch: generic conversation persistence, deterministic development actor, ElevenLabs adapters, browser demo, confirmation transaction, focused tests, and setup documentation are implemented; web verification passes locally.
+- Task 006 working branch: generic conversation persistence, deterministic development actor, ElevenLabs adapters, browser demo, confirmation transaction, focused tests, Release 1A disclosure, and setup documentation are implemented; the latest disclosure/documentation slice is not yet owner-verified.
 
 ## Important Decisions
 - Use Next.js/TypeScript, FastAPI/Python 3.13, SQLAlchemy 2, psycopg 3, Alembic, and Neon PostgreSQL.
@@ -30,7 +30,9 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 - Seed one deterministic development agency, actor, and active membership only in development.
 - Use `conversation_sessions` and `conversation_intakes`; provider names never appear in business table or API names.
 - Use ElevenLabs two-way WebRTC with a server-minted short-lived token and server-only API key.
+- Require explicit owner selection of the provider LLM, STT, TTS, and voice; unavailable selections stop setup instead of silently falling back.
 - Limit each session to 180 seconds, each agency to one concurrent session, and each UTC day to ten authorizations.
+- Enable ElevenLabs ZRM when the account supports it. Its absence is acceptable only for the synthetic development demo and blocks every real-data and production mode.
 - Bound browser conversation API requests to 15 seconds; connection failures enter a cleanup state before retry and terminal confirmation failures require a new session.
 - Make confirmed intakes immutable and confirmation idempotent; customer, intake, audit, and session confirmation share one transaction.
 - Use a forward Alembic revision for conversation tables because the verified initial migration is an established baseline.
@@ -44,7 +46,7 @@ Production authentication, real customer use, complete customer management, tele
 - Task 006 backend checks and migration remain unverified locally under the owner testing policy; `npm run verify:web` passes with the documented public environment values.
 - `package.json` adds the ElevenLabs React SDK; the lockfile must be regenerated and reviewed before `npm ci` can verify the web app.
 - Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.
-- Final disclosure language, provider region, voice, and language model still require owner approval before any public use.
+- The Release 1A synthetic-demo disclosure is owner-approved and implemented; provider region, LLM, STT, TTS, voice, privacy controls, and billing controls still require owner selection and dashboard verification before enabling the feature flags.
 - Browser transcript callbacks can contain evolving recognition text; the UI de-duplicates adjacent updates and explicit review remains mandatory.
 - The development actor is deliberately not production authentication and the routes are hidden unless development-only flags and seed data agree.
 - Never run database downgrade/rebuild commands unless `TEST_DATABASE_URL` is confirmed disposable and isolated.
