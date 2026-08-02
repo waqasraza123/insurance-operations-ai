@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
 from insurance_operations.database.models.base import Base
+from insurance_operations.database.models.conversation import (
+    ConversationIntake,
+    ConversationSession,
+)
 from insurance_operations.database.models.customer import Customer
 from insurance_operations.database.models.identity import (
     Agency,
@@ -27,6 +31,14 @@ TABLE_OWNERSHIP = {
         agency_column="agency_id",
     ),
     "customers": TableOwnership(module="customers", agency_column="agency_id"),
+    "conversation_sessions": TableOwnership(
+        module="conversations",
+        agency_column="agency_id",
+    ),
+    "conversation_intakes": TableOwnership(
+        module="conversations",
+        agency_column="agency_id",
+    ),
     "audit_events": TableOwnership(module="audit", agency_column="agency_id"),
     "idempotency_records": TableOwnership(
         module="idempotency",
@@ -35,13 +47,15 @@ TABLE_OWNERSHIP = {
 }
 
 __all__ = [
-    "TABLE_OWNERSHIP",
     "Agency",
     "AgencyMembership",
     "AppUser",
     "AuditEvent",
     "Base",
+    "ConversationIntake",
+    "ConversationSession",
     "Customer",
     "IdempotencyRecord",
+    "TABLE_OWNERSHIP",
     "TableOwnership",
 ]

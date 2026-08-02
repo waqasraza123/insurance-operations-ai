@@ -18,13 +18,11 @@ def api_settings() -> ApiSettings:
         app_environment=RuntimeEnvironment.TEST,
         api_host="127.0.0.1",
         api_port=8000,
+        web_origin="http://localhost:3000",
         database_url="postgresql://user:password@localhost/development",
         test_database_url="postgresql://user:password@localhost/test",
         database_ssl_mode=DatabaseSslMode.DISABLE,
-        supabase_auth_issuer="https://example.supabase.co/auth/v1",
-        supabase_auth_jwks_url=(
-            "https://example.supabase.co/auth/v1/.well-known/jwks.json"
-        ),
+        conversation_ai_enabled=False,
     )
 
 
@@ -74,15 +72,26 @@ def test_ready_hides_database_failure_details() -> None:
     assert body == {"detail": "database unavailable"}
 
 
-def test_protected_route_requires_bearer_token() -> None:
+def test_development_conversation_route_is_hidden_when_disabled() -> None:
     database_engine = Mock(spec=Engine)
 
-    status_code, body = asyncio.run(
-        get_response("/api/v1/me", database_engine)
-    )
+    async def post_session() -> tuple[int, object]:
+        transport = ASGITransport(app=create_app(api_settings(), database_engine))
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/development/conversation-sessions",
+                json={
+                    "ai_disclosure_accepted": True,
+                    "microphone_consent_granted": True,
+                    "synthetic_data_acknowledged": True,
+                },
+            )
+        return response.status_code, response.json()
 
-    assert status_code == 401
+    status_code, body = asyncio.run(post_session())
+
+    assert status_code == 404
     assert isinstance(body, dict)
     error = body["error"]
     assert isinstance(error, dict)
-    assert error["code"] == "UNAUTHENTICATED"
+    assert error["code"] == "NOT_FOUND"

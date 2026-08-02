@@ -65,7 +65,7 @@ After migrating a development database:
 insurance-operations-seed-development
 ```
 
-The command creates only `Development Agency` with slug `development-agency`, environment kind `DEVELOPMENT`, and UUID `00000000-0000-4000-8000-000000000001`. Repeated execution is safe. It creates no users, memberships, customers, or demo data and refuses non-development environments.
+The command creates `Development Agency`, one deterministic `Synthetic Voice AI Tester` actor, and one active membership. Repeated execution is safe. It creates no customers or intake data and refuses non-development environments.
 
 ## Foundation Tables
 
@@ -75,6 +75,8 @@ The command creates only `Development Agency` with slug `development-agency`, en
 - `customers`: agency-owned contact aggregate with normalized search fields and structured address.
 - `audit_events`: append-only, agency-owned business history with explicit resource references.
 - `idempotency_records`: agency-owned request outcome protection scoped by actor type, actor identity, route, and key.
+- `conversation_sessions`: agency-owned consent, authorization, quota, provider-metadata, and lifecycle state without credentials or transcript text.
+- `conversation_intakes`: immutable, explicitly confirmed transcript and intake intent linked to one session and customer.
 
 All primary keys are UUIDs. Mutable aggregates use UTC timestamps and a database trigger that updates `updated_at` and increments a positive `row_version`. Business ownership foreign keys use `RESTRICT`; no cascade deletion is introduced. Nullable demo and future-resource UUIDs receive foreign keys only when their approved parent tables are added in migration order.
 

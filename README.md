@@ -1,45 +1,52 @@
 # Insurance Operations AI
 
-The repository contains a Next.js frontend, FastAPI web service, Python worker, and shared Neon-compatible PostgreSQL persistence. The current task branch adds the protected actor and minimal customer foundation required before browser Voice AI intake.
-
-## Requirements
-
-- Node.js 22
-- Python 3.13
+Next.js frontend, FastAPI API, separate Python worker, and shared Neon PostgreSQL persistence. The current development slice provides a synthetic, consent-gated, two-way ElevenLabs Voice AI intake with explicit review before customer creation.
 
 ## Setup
+
+Requires Node.js 22 and Python 3.13.
 
 ```bash
 cp .env.example .env
 set -a
 source .env
 set +a
+npm install --package-lock-only --ignore-scripts --workspace @insurance-operations/web
 npm ci
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-Set `DATABASE_URL` to the Neon pooled runtime URL and `DIRECT_DATABASE_URL` to the direct Neon URL used by Alembic. Set `TEST_DATABASE_URL` to a separate disposable database. See `docs/database-setup.md` for SSL, migration, and isolation requirements.
+Use a Neon pooled URL for `DATABASE_URL`, a direct URL for `DIRECT_DATABASE_URL`, and a separate disposable database for `TEST_DATABASE_URL`. Never commit `.env` or a connection string. See [database setup](docs/database-setup.md).
 
-Set `SUPABASE_AUTH_ISSUER` and `SUPABASE_AUTH_JWKS_URL` from the approved Supabase project. The API accepts only asymmetric Supabase access tokens with the configured issuer and audience. Never add a service-role key or access token to repository files.
-
-The two authentication-slice dependencies are narrow: PyJWT's cryptographic extra validates asymmetric JWT/JWKS signatures and `email-validator` supplies standards-based validation for optional customer email addresses.
-
-## Database
-
-Apply the current migration and seed the single development agency:
+## Development Database
 
 ```bash
 alembic upgrade head
 insurance-operations-seed-development
 ```
 
-The seed is idempotent, creates the approved development agency identity, and refuses to run unless `APP_ENVIRONMENT=development`.
+The idempotent seed creates one development agency, deterministic synthetic actor, and active membership. It refuses test and production environments.
 
-## Start
+## Voice AI Configuration
 
-Run each command in a separate configured shell:
+Follow [the agent setup contract](docs/elevenlabs-agent-setup.md), then set the server-only `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, and privacy attestation. Enable both backend and public feature flags only for development:
+
+Keep both feature flags `false` until the owner completes the provider privacy and billing checklist. The owner must explicitly select the LLM, STT, TTS, and voice in ElevenLabs; the application does not silently select substitutes.
+
+```dotenv
+APP_ENVIRONMENT=development
+CONVERSATION_AI_ENABLED=true
+NEXT_PUBLIC_CONVERSATION_AI_ENABLED=true
+ELEVENLABS_PRIVACY_CONFIRMED=true
+```
+
+Do not use real customer data. The browser receives only a short-lived WebRTC token, never the API key.
+
+## Run
+
+Use separate configured shells:
 
 ```bash
 npm run dev:web
@@ -53,45 +60,25 @@ uvicorn insurance_operations.api:app --host "$API_HOST" --port "$API_PORT" --rel
 insurance-operations-worker
 ```
 
-Open `http://localhost:3000`. API liveness does not depend on PostgreSQL; readiness does:
-
-```bash
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/ready
-```
-
-Protected API examples require an existing Supabase user mapped to one active `app_users` row and one active `agency_memberships` row:
-
-```bash
-curl -H "Authorization: Bearer <access-token>" \
-  http://127.0.0.1:8000/api/v1/me
-
-curl -X POST http://127.0.0.1:8000/api/v1/customers \
-  -H "Authorization: Bearer <access-token>" \
-  -H "Idempotency-Key: <unique-key>" \
-  -H "Content-Type: application/json" \
-  --data '{"full_name":"Synthetic Customer","email":"synthetic@example.test"}'
-```
-
-`/app` is only a protected shell, not a sign-in flow. It expects the future server-side authentication integration to set the cookie named by `AUTH_ACCESS_TOKEN_COOKIE_NAME` with `HttpOnly`, `Secure`, and `SameSite=Lax` protections. Do not expose an access token through client JavaScript.
+Open `http://localhost:3000` and select **Test Voice AI**. Accept all three acknowledgements, speak with the assistant, finish within three minutes, edit the transcript/details, then confirm. Only confirmation persists the transcript and creates a customer.
 
 ## Verify
+
+Export the repository-root `.env` into the current shell before web verification; the workspace build does not automatically load that file. Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
 
 ```bash
 npm run verify:web
 ruff format --check .
 ruff check .
 mypy apps/backend/src tests
+APP_ENVIRONMENT=test alembic downgrade base
+APP_ENVIRONMENT=test alembic upgrade head
+APP_ENVIRONMENT=test alembic current
+APP_ENVIRONMENT=test alembic check
 APP_ENVIRONMENT=test pytest
-alembic check
 insurance-operations-worker --check
 ```
 
-For focused verification of this slice:
+Manual QA: verify disabled flags hide the route; deny microphone permission; force a disconnect while connecting and while active; confirm the ending state prevents retry until cleanup finishes; observe the 3:00 countdown; test mute/unmute; confirm the 11th daily authorization is rejected with clear guidance; retry one transient confirmation with the same idempotency key; confirm an expired session requires a new conversation; inspect that no raw audio or draft transcript exists in PostgreSQL or logs; and verify provider audio saving/retention settings in the dashboard.
 
-```bash
-pytest tests/test_authentication.py tests/test_api.py -vv
-APP_ENVIRONMENT=test pytest tests/database/test_customer_api.py -vv
-```
-
-Database tests downgrade and rebuild only the database selected by `TEST_DATABASE_URL`; never point it at development, preview, or production. The seven approved Release 1 planning PDFs are retained in `docs/release1/`. Read `AGENTS.md` and `docs/project-state.md` before extending the system.
+The approved Release 1 PDFs remain in `docs/release1/`. Read `AGENTS.md` and `docs/project-state.md` before changing architecture or scope.

@@ -8,6 +8,8 @@ EXPECTED_OWNERSHIP = {
     "app_users": ("identity", None),
     "agency_memberships": ("identity", "agency_id"),
     "customers": ("customers", "agency_id"),
+    "conversation_sessions": ("conversations", "agency_id"),
+    "conversation_intakes": ("conversations", "agency_id"),
     "audit_events": ("audit", "agency_id"),
     "idempotency_records": ("idempotency", "agency_id"),
 }
@@ -54,6 +56,16 @@ def test_foundation_relationships_match_available_parent_tables(
         },
         "customers": {
             (("agency_id",), "agencies"),
+            (("created_by",), "app_users"),
+        },
+        "conversation_sessions": {
+            (("agency_id",), "agencies"),
+            (("initiated_by",), "app_users"),
+        },
+        "conversation_intakes": {
+            (("agency_id",), "agencies"),
+            (("customer_id",), "customers"),
+            (("conversation_session_id",), "conversation_sessions"),
             (("created_by",), "app_users"),
         },
         "audit_events": {

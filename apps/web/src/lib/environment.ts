@@ -1,5 +1,6 @@
 export type PublicEnvironment = Readonly<{
   apiBaseUrl: string;
+  conversationAiEnabled: boolean;
 }>;
 
 export class EnvironmentValidationError extends Error {
@@ -36,5 +37,19 @@ export function parsePublicEnvironment(
     );
   }
 
-  return { apiBaseUrl: apiUrl.toString().replace(/\/$/, "") };
+  const rawConversationAiEnabled =
+    values.NEXT_PUBLIC_CONVERSATION_AI_ENABLED?.trim().toLowerCase() ?? "false";
+  if (
+    rawConversationAiEnabled !== "true" &&
+    rawConversationAiEnabled !== "false"
+  ) {
+    throw new EnvironmentValidationError(
+      "NEXT_PUBLIC_CONVERSATION_AI_ENABLED must be true or false",
+    );
+  }
+
+  return {
+    apiBaseUrl: apiUrl.toString().replace(/\/$/, ""),
+    conversationAiEnabled: rawConversationAiEnabled === "true",
+  };
 }

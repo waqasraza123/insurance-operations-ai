@@ -11,7 +11,10 @@ describe("parsePublicEnvironment", () => {
       parsePublicEnvironment({
         NEXT_PUBLIC_API_BASE_URL: "https://api.example.com/",
       }),
-    ).toEqual({ apiBaseUrl: "https://api.example.com" });
+    ).toEqual({
+      apiBaseUrl: "https://api.example.com",
+      conversationAiEnabled: false,
+    });
   });
 
   it("rejects a missing API URL", () => {
@@ -24,5 +27,23 @@ describe("parsePublicEnvironment", () => {
     expect(() =>
       parsePublicEnvironment({ NEXT_PUBLIC_API_BASE_URL: "ftp://example.com" }),
     ).toThrow("NEXT_PUBLIC_API_BASE_URL must use HTTP or HTTPS");
+  });
+
+  it("parses the public conversation feature flag", () => {
+    expect(
+      parsePublicEnvironment({
+        NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000",
+        NEXT_PUBLIC_CONVERSATION_AI_ENABLED: "true",
+      }).conversationAiEnabled,
+    ).toBe(true);
+  });
+
+  it("rejects an invalid public conversation feature flag", () => {
+    expect(() =>
+      parsePublicEnvironment({
+        NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000",
+        NEXT_PUBLIC_CONVERSATION_AI_ENABLED: "yes",
+      }),
+    ).toThrow("NEXT_PUBLIC_CONVERSATION_AI_ENABLED must be true or false");
   });
 });
