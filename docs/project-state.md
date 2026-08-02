@@ -3,7 +3,7 @@
 The product is an operations portfolio platform for small independent U.S. insurance agencies. By owner decision, browser-based Voice AI intake now precedes the Document AI flow. Voice Release 1A collects basic customer/contact details and intake intent with microphone consent, editable transcription, and explicit confirmation. It is not an agency management system, telephony system, quoting tool, coverage-verification service, or autonomous insurance agent.
 
 ## Current Architecture
-The repository is a single coordinated codebase with three independently runnable identities: a Next.js TypeScript frontend, a FastAPI web service, and a separate Python worker process. FastAPI and worker share synchronous SQLAlchemy 2 and psycopg 3 connections for Neon PostgreSQL. Runtime traffic uses a bounded pooled URL; Alembic uses a direct, non-pooled migration connection. The initial schema contains agencies, application users, memberships, customers, audit events, and idempotency records. Task 005 adds asymmetric Supabase JWT verification, active user/membership/agency resolution, backend actor context, protected API routes, idempotent audited customer creation, and a minimal protected frontend shell; owner verification is pending.
+The repository is a single coordinated codebase with three independently runnable identities: a Next.js TypeScript frontend, a FastAPI web service, and a separate Python worker process. FastAPI and worker share synchronous SQLAlchemy 2 and psycopg 3 connections for Neon PostgreSQL. Runtime traffic uses a bounded pooled URL; Alembic uses a direct, non-pooled migration connection. The initial schema contains agencies, application users, memberships, customers, audit events, and idempotency records. Task 005 adds asymmetric Supabase JWT verification, active user/membership/agency resolution, backend actor context, protected API routes, idempotent audited customer creation, and a minimal protected frontend shell; it is merged into `main`, and owner verification is pending.
 
 ## Non-Negotiable Rules
 - Human approval is required before candidate data can affect approved policy data.
@@ -18,11 +18,12 @@ The repository is a single coordinated codebase with three independently runnabl
 - Transcription provider selection requires separate owner approval after a controlled evaluation.
 
 ## Current Roadmap
-Task 001 established repository guardrails and the three runtime identities. Tasks 002–003 added Neon connection handling and persistence; Task 004 verified that foundation against an isolated disposable Neon test database. The owner then approved Voice AI before Document AI. Task 005 defines Voice Release 1A and implements the authentication/minimal-customer prerequisite on a task branch. Next are owner verification, provider-neutral Voice intake, controlled provider evaluation/integration, a polished Voice portfolio flow, then Document AI and remaining operations.
+Task 001 established repository guardrails and the three runtime identities. Tasks 002–003 added Neon connection handling and persistence; Task 004 verified that foundation against an isolated disposable Neon test database. The owner then approved Voice AI before Document AI. Task 005 defines Voice Release 1A and implements the authentication/minimal-customer prerequisite on `main`. Next are owner verification, provider-neutral Voice intake, controlled provider evaluation/integration, a polished Voice portfolio flow, then Document AI and remaining operations.
 
 ## Completed Major Slices
 - Task 001: repository memory system and minimal runnable foundation.
 - Tasks 002–004 database foundation: isolated Neon migration rebuild, 24 database tests, Alembic agreement, formatting, linting, and strict typing verified.
+- Task 005 Voice AI foundation: implementation merged into `main`; owner verification remains pending.
 
 ## Important Decisions
 - Use one Git repository while keeping frontend, API, and worker runtime responsibilities separate.
@@ -53,7 +54,7 @@ Owner verification of Task 005; Supabase sign-in, sign-out, refresh, recovery, a
 - Preserve independently deployable web and worker behavior as shared backend code grows.
 - Supabase projects using legacy symmetric JWT signing are not supported by the Task 005 verifier; use the configured asymmetric JWKS contract or obtain owner approval for a different trusted verification mechanism.
 - The protected shell cannot establish a browser session until the separately scoped server-side Supabase sign-in flow sets the hardened access-token cookie.
-- Task 005 adds dependencies and code without local installation or verification, as required by the owner; treat the branch as unverified until the listed checks pass.
+- Task 005 adds dependencies and code without local installation or verification, as required by the owner; treat the merged implementation as unverified until the listed checks pass.
 
 ## Standard Verification
 - `npm run verify:web`
