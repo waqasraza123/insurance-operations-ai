@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Self
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, HttpUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -106,6 +106,37 @@ class DatabaseSettings(CommonSettings):
 class ApiSettings(DatabaseSettings):
     api_host: str = Field(min_length=1)
     api_port: int = Field(ge=1, le=65_535)
+    supabase_auth_issuer: HttpUrl
+    supabase_auth_audience: str = Field(default="authenticated", min_length=1)
+    supabase_auth_jwks_url: HttpUrl
+    auth_clock_skew_seconds: int = Field(default=30, ge=0, le=120)
+    idempotency_retention_hours: int = Field(default=24, ge=1, le=168)
+
+    @field_validator("supabase_auth_audience")
+    @classmethod
+    def validate_authentication_audience(cls, value: str) -> str:
+        normalized_value = value.strip()
+        if not normalized_value:
+            raise ValueError("authentication audience cannot be empty")
+        return normalized_value
+
+    @model_validator(mode="after")
+    def validate_authentication_endpoints(self) -> Self:
+        if (
+            self.app_environment is RuntimeEnvironment.PRODUCTION
+            and (
+                self.supabase_auth_issuer.scheme != "https"
+                or self.supabase_auth_jwks_url.scheme != "https"
+            )
+        ):
+            raise ValueError("authentication endpoints must use HTTPS in production")
+        if (
+            self.supabase_auth_issuer.scheme != self.supabase_auth_jwks_url.scheme
+            or self.supabase_auth_issuer.host != self.supabase_auth_jwks_url.host
+            or self.supabase_auth_issuer.port != self.supabase_auth_jwks_url.port
+        ):
+            raise ValueError("authentication issuer and JWKS URL must share an origin")
+        return self
 
 
 class WorkerSettings(DatabaseSettings):

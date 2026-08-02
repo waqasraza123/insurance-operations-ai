@@ -21,6 +21,10 @@ def api_settings() -> ApiSettings:
         database_url="postgresql://user:password@localhost/development",
         test_database_url="postgresql://user:password@localhost/test",
         database_ssl_mode=DatabaseSslMode.DISABLE,
+        supabase_auth_issuer="https://example.supabase.co/auth/v1",
+        supabase_auth_jwks_url=(
+            "https://example.supabase.co/auth/v1/.well-known/jwks.json"
+        ),
     )
 
 
@@ -68,3 +72,17 @@ def test_ready_hides_database_failure_details() -> None:
 
     assert status_code == 503
     assert body == {"detail": "database unavailable"}
+
+
+def test_protected_route_requires_bearer_token() -> None:
+    database_engine = Mock(spec=Engine)
+
+    status_code, body = asyncio.run(
+        get_response("/api/v1/me", database_engine)
+    )
+
+    assert status_code == 401
+    assert isinstance(body, dict)
+    error = body["error"]
+    assert isinstance(error, dict)
+    assert error["code"] == "UNAUTHENTICATED"

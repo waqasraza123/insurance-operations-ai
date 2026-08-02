@@ -42,6 +42,21 @@ section {
   margin-top: 3rem;
 }
 
+.workspace-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #155e57;
+  font-weight: 700;
+}
+
+.foundation-card {
+  padding: 1.5rem;
+  border: 1px solid #d4dfe1;
+  border-radius: 0.75rem;
+  background: #ffffff;
+  line-height: 1.6;
+}
+
 dl {
   display: grid;
   gap: 0.75rem;

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getBackendStatus } from "@/lib/backend-health";
 
 export default async function Home() {
@@ -8,9 +10,12 @@ export default async function Home() {
       <p className="eyebrow">Release 1 foundation</p>
       <h1>Insurance Operations AI</h1>
       <p className="summary">
-        The frontend, API, and worker boundaries are ready for the first
-        approved product slice.
+        The shared foundation now supports backend-authorized customer intake.
+        Voice capture remains intentionally unavailable.
       </p>
+      <Link className="workspace-link" href="/app">
+        Open protected workspace
+      </Link>
       <section aria-labelledby="runtime-status">
         <h2 id="runtime-status">Runtime status</h2>
         <dl>

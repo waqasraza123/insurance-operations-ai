@@ -1,14 +1,13 @@
 # Implementation Backlog
 
-This order favors the fastest safe path to a reviewable product while preserving the approved boundaries in Documents 4, 6, and 7.
+This owner-approved order puts browser Voice AI before Document AI while preserving the shared contracts in Documents 1, 4, 6, and 7.
 
-1. **Verified foundation** — Run the Task 004 migration, constraint, connection, readiness, lint, and type checks against a disposable PostgreSQL database. Resolve failures before extending persistence.
-2. **Authentication and customer** — Implement FastAPI-owned identity, membership authorization, protected shell, and the idempotent customer workflow from Document 7 Milestones 4–5.
-3. **Private PDF upload** — Add private Storage, signed upload/download authorization, file metadata, and one durable Processing transition from Milestone 6. Keep file bytes outside PostgreSQL.
-4. **Durable worker** — Add the PostgreSQL job, lease, heartbeat, reclaim, and stage contracts from Milestone 7 before any live provider work.
-5. **Provider-neutral candidate** — Implement the immutable candidate, evidence, validation, warning, fixture, and Stored Result contracts from Milestone 8 without selecting a provider.
-6. **Review and approval** — Build granular human review and immutable approval against the provider-neutral fixture path. Preserve candidate/review/approved separation, optimistic concurrency, audit, and Current-policy uniqueness.
-7. **Document AI evaluation and integration** — Run the controlled benchmark in Milestone 9, record the Milestone 10 owner decision, then integrate only the winning pipeline through the existing candidate contract as bounded Milestones 11–12 work.
-8. **Narrow Voice AI extension** — Start only after a separate owner-approved product, architecture, data, privacy, evaluation, and operational specification. Voice AI is outside Release 1.
+1. **Verified foundation** — Preserve the isolated Neon migration, constraint, connection, readiness, lint, typing, and test baseline.
+2. **Authentication and minimal customer foundation** — Verify Supabase token validation, backend actor and agency resolution, protected routes, idempotent customer creation, audit recording, and the protected shell implemented by Task 005.
+3. **Provider-neutral Voice AI intake** — Add consent, bounded browser capture, typed fallback, editable transcript, explicit confirmation, and confirmed-transcript persistence against `docs/voice-ai-release1a.md`, without selecting a provider.
+4. **Voice AI provider evaluation and integration** — Benchmark eligible transcription providers on synthetic representative audio, privacy, latency, accuracy, failure behavior, and cost; record owner approval before integrating one adapter.
+5. **Voice AI polished portfolio flow** — Complete accessible UX, interruption/retry states, usage limits, operational observability, and a synthetic end-to-end demonstration without telephony or autonomous insurance behavior.
+6. **Document AI foundation, evaluation, review, and approval** — Implement private PDF storage, durable processing, provider-neutral candidates, controlled evaluation, human review, immutable approval, and audit in dependency order.
+7. **Remaining operational features** — Add only separately approved policy, email, demo, deployment, and operational slices after the two portfolio flows have safe foundations.
 
-Each item must be split into one reviewable vertical slice with its migration, focused tests, security boundary, rollback note, and owner verification. Do not combine provider selection with product workflow implementation.
+Each item must remain a reviewable vertical slice with focused tests, security boundaries, rollback notes, and owner verification. Provider selection must not be combined with capability-boundary implementation.
