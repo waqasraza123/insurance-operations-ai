@@ -13,9 +13,7 @@ export type ConversationDraft = Readonly<{
 }>;
 
 export type ConversationConnectionStatus =
-  | "disconnected"
-  | "connecting"
-  | "connected";
+  "disconnected" | "connecting" | "connected";
 
 export type ConversationMode = "speaking" | "listening" | undefined;
 
@@ -41,4 +39,3 @@ export type ConfirmedConversationIntake = Readonly<{
   customerName: string;
   confirmedAt: string;
 }>;
-

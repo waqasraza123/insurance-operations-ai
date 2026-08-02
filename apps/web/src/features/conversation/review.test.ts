@@ -3,18 +3,15 @@ import { describe, expect, it } from "vitest";
 import { appendTranscript, validateConfirmation } from "./review";
 
 describe("conversation review", () => {
-  it(
-    "replaces an adjacent partial transcript instead of duplicating it",
-    () => {
-      expect(
-        appendTranscript(
-          [{ speaker: "USER", text: "I need renters" }],
-          "USER",
-          "I need renters insurance",
-        ),
-      ).toEqual([{ speaker: "USER", text: "I need renters insurance" }]);
-    },
-  );
+  it("replaces an adjacent partial transcript instead of duplicating it", () => {
+    expect(
+      appendTranscript(
+        [{ speaker: "USER", text: "I need renters" }],
+        "USER",
+        "I need renters insurance",
+      ),
+    ).toEqual([{ speaker: "USER", text: "I need renters insurance" }]);
+  });
 
   it("requires contact, intent, and both conversation speakers", () => {
     expect(

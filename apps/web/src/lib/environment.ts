@@ -38,8 +38,7 @@ export function parsePublicEnvironment(
   }
 
   const rawConversationAiEnabled =
-    values.NEXT_PUBLIC_CONVERSATION_AI_ENABLED?.trim().toLowerCase() ??
-    "false";
+    values.NEXT_PUBLIC_CONVERSATION_AI_ENABLED?.trim().toLowerCase() ?? "false";
   if (
     rawConversationAiEnabled !== "true" &&
     rawConversationAiEnabled !== "false"

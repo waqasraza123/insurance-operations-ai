@@ -22,7 +22,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 - Task 001: repository memory and minimal frontend, API, and worker runtimes.
 - Tasks 002–004: verified Neon connection, migrations, six approved foundation tables, ownership, readiness, CI PostgreSQL, and development agency seed.
 - Task 005: prior authentication/customer prerequisite merged; its Supabase implementation is removed by the current owner decision.
-- Task 006 working branch: generic conversation persistence, deterministic development actor, ElevenLabs adapters, browser demo, confirmation transaction, focused tests, and setup documentation are implemented but not locally verified.
+- Task 006 working branch: generic conversation persistence, deterministic development actor, ElevenLabs adapters, browser demo, confirmation transaction, focused tests, and setup documentation are implemented; web verification passes locally.
 
 ## Important Decisions
 - Use Next.js/TypeScript, FastAPI/Python 3.13, SQLAlchemy 2, psycopg 3, Alembic, and Neon PostgreSQL.
@@ -39,7 +39,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 Production authentication, real customer use, complete customer management, telephony, raw-audio storage, provider fallback, uploads, Storage, durable jobs, Document AI, OCR, review/approval UI, email, deployment configuration, and remaining business tables.
 
 ## Risks / Watchouts
-- Task 006 code and migration are intentionally unverified locally under the owner testing policy.
+- Task 006 backend checks and migration remain unverified locally under the owner testing policy; `npm run verify:web` passes with the documented public environment values.
 - `package.json` adds the ElevenLabs React SDK; the lockfile must be regenerated and reviewed before `npm ci` can verify the web app.
 - Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.
 - Final disclosure language, provider region, voice, and language model still require owner approval before any public use.
@@ -60,4 +60,3 @@ Production authentication, real customer use, complete customer management, tele
 - `APP_ENVIRONMENT=test alembic check`
 - `APP_ENVIRONMENT=test pytest`
 - `insurance-operations-worker --check`
-

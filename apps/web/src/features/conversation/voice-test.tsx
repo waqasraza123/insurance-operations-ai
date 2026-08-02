@@ -51,7 +51,7 @@ const EMPTY_FORM: IntakeForm = {
 export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
   const [transcript, setTranscript] = useState<ConversationTurn[]>([]);
   const [form, setForm] = useState<IntakeForm>(EMPTY_FORM);
-  const [failureVersion, setFailureVersion] = useState(0);
+  const failureHandlerRef = useRef<() => void>(() => undefined);
   const phaseRef = useRef<Phase>("idle");
   const sessionIdRef = useRef<string | undefined>(undefined);
   const intentionalEndRef = useRef(false);
@@ -85,7 +85,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
     void endConversationSession(apiBaseUrl, sessionId, "INTERRUPTED").catch(
       () => undefined,
     );
-    setFailureVersion((current) => current + 1);
+    failureHandlerRef.current();
   }, [apiBaseUrl, intentionalEndRef]);
 
   const handleError = useCallback(() => {
@@ -99,7 +99,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
       );
     }
     phaseRef.current = "error";
-    setFailureVersion((current) => current + 1);
+    failureHandlerRef.current();
   }, [apiBaseUrl, intentionalEndRef]);
 
   return (
@@ -114,7 +114,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
           apiBaseUrl={apiBaseUrl}
           client={client}
           form={form}
-          failureVersion={failureVersion}
+          failureHandlerRef={failureHandlerRef}
           intentionalEndRef={intentionalEndRef}
           phaseRef={phaseRef}
           sessionIdRef={sessionIdRef}
@@ -130,7 +130,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
 type ExperienceProperties = Readonly<{
   apiBaseUrl: string;
   client: ConversationClient;
-  failureVersion: number;
+  failureHandlerRef: MutableRefObject<() => void>;
   form: IntakeForm;
   intentionalEndRef: MutableRefObject<boolean>;
   phaseRef: MutableRefObject<Phase>;
@@ -143,7 +143,7 @@ type ExperienceProperties = Readonly<{
 function VoiceTestExperience({
   apiBaseUrl,
   client,
-  failureVersion,
+  failureHandlerRef,
   form,
   intentionalEndRef,
   phaseRef,
@@ -214,15 +214,19 @@ function VoiceTestExperience({
     finishConversationRef.current = finishConversation;
   }, [finishConversation]);
 
-  useEffect(() => {
-    if (failureVersion === 0) {
-      return;
-    }
+  const handleConnectionFailure = useCallback(() => {
     setErrorMessage(
       "The live voice connection ended unexpectedly. Start a new session.",
     );
     setPhase("error");
-  }, [failureVersion, setPhase]);
+  }, [setPhase]);
+
+  useEffect(() => {
+    failureHandlerRef.current = handleConnectionFailure;
+    return () => {
+      failureHandlerRef.current = () => undefined;
+    };
+  }, [failureHandlerRef, handleConnectionFailure]);
 
   useEffect(() => {
     if (phase !== "active") {
@@ -544,12 +548,10 @@ function VoiceTestExperience({
                 : "Confirm and create customer"}
             </button>
           )}
-          {phase === "saving" && (
-            <p aria-live="polite">Saving confirmation…</p>
-          )}
+          {phase === "saving" && <p aria-live="polite">Saving confirmation…</p>}
           {savedIntake && (
             <p className="success-message" aria-live="polite">
-              Saved customer {savedIntake.customerName}. Intake ID: {" "}
+              Saved customer {savedIntake.customerName}. Intake ID:{" "}
               <code>{savedIntake.conversationIntakeId}</code>
             </p>
           )}

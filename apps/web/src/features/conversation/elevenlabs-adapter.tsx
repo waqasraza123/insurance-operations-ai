@@ -61,7 +61,7 @@ function AdapterBridge({
       onError(
         typeof message === "string" ? message : "Voice connection failed",
       );
-      void controls.endSession().catch(() => undefined);
+      controls.endSession();
     },
     onMessage: (message) => {
       const speaker = message.source === "user" ? "USER" : "AGENT";
@@ -73,7 +73,8 @@ function AdapterBridge({
   });
 
   const client: ConversationClient = {
-    status: conversation.status,
+    status:
+      conversation.status === "error" ? "disconnected" : conversation.status,
     mode: conversation.mode,
     isMuted: conversation.isMuted,
     start: async (credential) => {

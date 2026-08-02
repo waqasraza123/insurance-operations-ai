@@ -1,4 +1,1 @@
-export {
-  ElevenLabsConversationAdapter as ConfiguredConversationAdapter,
-} from "./elevenlabs-adapter";
-
+export { ElevenLabsConversationAdapter as ConfiguredConversationAdapter } from "./elevenlabs-adapter";
