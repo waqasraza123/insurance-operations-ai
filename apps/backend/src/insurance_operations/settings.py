@@ -71,10 +71,16 @@ class DatabaseSettings(CommonSettings):
         if (
             self.app_environment is RuntimeEnvironment.TEST
             and self.test_database_url is not None
-            and database_target(self.test_database_url)
-            == database_target(self.database_url)
+            and any(
+                database_target(self.test_database_url) == database_target(url)
+                for url in (self.database_url, self.direct_database_url)
+                if url is not None
+            )
         ):
-            raise ValueError("TEST_DATABASE_URL must be isolated from DATABASE_URL")
+            raise ValueError(
+                "TEST_DATABASE_URL must be isolated from database runtime and "
+                "migration URLs"
+            )
         if (
             self.app_environment is RuntimeEnvironment.PRODUCTION
             and self.database_ssl_mode is DatabaseSslMode.DISABLE
@@ -108,8 +114,12 @@ class WorkerSettings(DatabaseSettings):
 
 def database_target(value: str) -> tuple[str | None, int, str | None]:
     parsed_url = make_url(value)
+    host = parsed_url.host.lower() if parsed_url.host is not None else None
+    if host is not None:
+        first_label, separator, remaining_labels = host.partition(".")
+        host = first_label.removesuffix("-pooler") + separator + remaining_labels
     return (
-        parsed_url.host.lower() if parsed_url.host is not None else None,
+        host,
         parsed_url.port or 5432,
         parsed_url.database,
     )

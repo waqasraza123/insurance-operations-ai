@@ -17,7 +17,9 @@ from insurance_operations.settings import WorkerSettings
 
 
 def readiness(settings: WorkerSettings) -> dict[str, str]:
-    database_engine = create_database_engine(settings, service_name=settings.worker_name)
+    database_engine = create_database_engine(
+        settings, service_name=settings.worker_name
+    )
     try:
         check_database_readiness(database_engine)
     finally:
@@ -36,7 +38,9 @@ def run(settings: WorkerSettings) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     logger = logging.getLogger(__name__)
     stopped = Event()
-    database_engine = create_database_engine(settings, service_name=settings.worker_name)
+    database_engine = create_database_engine(
+        settings, service_name=settings.worker_name
+    )
 
     def request_shutdown(signum: int, frame: FrameType | None) -> None:
         del signum, frame

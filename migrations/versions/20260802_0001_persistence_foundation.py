@@ -11,7 +11,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-
 revision: str = "20260802_0001"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
@@ -87,19 +86,19 @@ def upgrade() -> None:
         archived_at_column(),
         sa.CheckConstraint(
             "length(btrim(name)) BETWEEN 1 AND 160",
-            name="ck_agencies_name_length_valid",
+            name="name_length_valid",
         ),
         sa.CheckConstraint(
             "length(btrim(slug)) > 0 AND slug = lower(slug)",
-            name="ck_agencies_slug_lowercase",
+            name="slug_lowercase",
         ),
         sa.CheckConstraint(
             "environment_kind IN ('DEVELOPMENT', 'DEMO', 'PRODUCTION')",
-            name="ck_agencies_environment_kind_valid",
+            name="environment_kind_valid",
         ),
         sa.CheckConstraint(
             "row_version > 0",
-            name="ck_agencies_row_version_positive",
+            name="row_version_positive",
         ),
         sa.UniqueConstraint("slug", name="uq_agencies_slug"),
     )
@@ -127,20 +126,20 @@ def upgrade() -> None:
         sa.Column("disabled_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "length(btrim(display_name)) BETWEEN 1 AND 160",
-            name="ck_app_users_display_name_length_valid",
+            name="display_name_length_valid",
         ),
         sa.CheckConstraint(
             "status IN ('ACTIVE', 'DISABLED')",
-            name="ck_app_users_status_valid",
+            name="status_valid",
         ),
         sa.CheckConstraint(
             "(status = 'ACTIVE' AND disabled_at IS NULL) OR "
             "(status = 'DISABLED' AND disabled_at IS NOT NULL)",
-            name="ck_app_users_disabled_at_consistent",
+            name="disabled_at_consistent",
         ),
         sa.CheckConstraint(
             "row_version > 0",
-            name="ck_app_users_row_version_positive",
+            name="row_version_positive",
         ),
         sa.UniqueConstraint(
             "auth_subject",
@@ -175,11 +174,11 @@ def upgrade() -> None:
         sa.Column("deactivated_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "status IN ('ACTIVE', 'INACTIVE')",
-            name="ck_agency_memberships_status_valid",
+            name="status_valid",
         ),
         sa.CheckConstraint(
             "row_version > 0",
-            name="ck_agency_memberships_row_version_positive",
+            name="row_version_positive",
         ),
         sa.UniqueConstraint(
             "agency_id",
@@ -227,19 +226,19 @@ def upgrade() -> None:
         archived_at_column(),
         sa.CheckConstraint(
             "length(btrim(full_name)) BETWEEN 1 AND 200",
-            name="ck_customers_full_name_length_valid",
+            name="full_name_length_valid",
         ),
         sa.CheckConstraint(
             "state_code IS NULL OR length(state_code) = 2",
-            name="ck_customers_state_code_length_valid",
+            name="state_code_length_valid",
         ),
         sa.CheckConstraint(
             "length(country_code) = 2",
-            name="ck_customers_country_code_length_valid",
+            name="country_code_length_valid",
         ),
         sa.CheckConstraint(
             "row_version > 0",
-            name="ck_customers_row_version_positive",
+            name="row_version_positive",
         ),
     )
     op.create_index(
@@ -305,11 +304,11 @@ def upgrade() -> None:
         created_at_column(),
         sa.CheckConstraint(
             "actor_type IN ('STAFF', 'DEMO_USER', 'SYSTEM', 'WORKER')",
-            name="ck_audit_events_actor_type_valid",
+            name="actor_type_valid",
         ),
         sa.CheckConstraint(
             "event_version > 0",
-            name="ck_audit_events_event_version_positive",
+            name="event_version_positive",
         ),
     )
     op.create_index(
@@ -371,11 +370,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "length(idempotency_key) BETWEEN 1 AND 128",
-            name="ck_idempotency_records_key_length_valid",
+            name="key_length_valid",
         ),
         sa.CheckConstraint(
             "status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')",
-            name="ck_idempotency_records_status_valid",
+            name="status_valid",
         ),
         sa.UniqueConstraint(
             "actor_scope_type",

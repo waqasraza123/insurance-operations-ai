@@ -9,7 +9,6 @@ from insurance_operations.database.models import Agency
 from insurance_operations.database.models.identity import AgencyEnvironment
 from insurance_operations.settings import DatabaseSettings, RuntimeEnvironment
 
-
 DEVELOPMENT_AGENCY_ID = UUID("00000000-0000-4000-8000-000000000001")
 DEVELOPMENT_AGENCY_NAME = "Development Agency"
 DEVELOPMENT_AGENCY_SLUG = "development-agency"

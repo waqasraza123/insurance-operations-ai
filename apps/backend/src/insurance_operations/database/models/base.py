@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import BigInteger, DateTime, FetchedValue, MetaData, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",

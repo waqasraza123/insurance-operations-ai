@@ -15,10 +15,11 @@ The repository is a single coordinated codebase with three independently runnabl
 - Provider choices for PDF parsing, OCR, and AI remain deferred until the controlled evaluation gate.
 
 ## Current Roadmap
-Task 001 established repository guardrails and the three runtime identities. Tasks 002–003 added Neon connection handling and the initial persistence layer. Task 004 corrected that layer against Documents 4, 6, and 7; owner-run verification remains required before the foundation is complete. The prioritized path is recorded in `docs/implementation-backlog.md`: verification, authentication/customer, private PDF upload, durable worker, provider-neutral candidates, review/approval, controlled Document AI evaluation/integration, then a separately specified narrow Voice AI extension.
+Task 001 established repository guardrails and the three runtime identities. Tasks 002–003 added Neon connection handling and the initial persistence layer. Task 004 corrected that layer against Documents 4, 6, and 7; its database migration, constraints, isolation, seed, formatting, linting, and typing are verified against an isolated disposable Neon test database. The prioritized path is recorded in `docs/implementation-backlog.md`: authentication/customer, private PDF upload, durable worker, provider-neutral candidates, review/approval, controlled Document AI evaluation/integration, then a separately specified narrow Voice AI extension.
 
 ## Completed Major Slices
 - Task 001: repository memory system and minimal runnable foundation.
+- Tasks 002–004 database foundation: isolated Neon migration rebuild, 24 database tests, Alembic agreement, formatting, linting, and strict typing verified.
 
 ## Important Decisions
 - Use one Git repository while keeping frontend, API, and worker runtime responsibilities separate.
@@ -39,7 +40,7 @@ Owner-run foundation verification; authentication flows; authorization behavior;
 
 ## Risks / Watchouts
 - The approved PDFs name Supabase PostgreSQL; the later owner direction selecting Neon is authoritative for database hosting.
-- Task 004 was implemented without tests, migrations, builds, linting, or type checking under the active owner policy; run the documented verification before further schema work.
+- Task 004 database verification passed on 2026-08-02; frontend verification and live application workflow testing remain separate checks.
 - `demo_session_id` and audit references to not-yet-created domain tables intentionally have no foreign keys until those approved parent-table migrations exist.
 - If revision `20260802_0001` was already applied to shared data, do not apply the edited revision over it; create and review a forward correction migration instead.
 - Do not let foundation placeholders become unreviewed business or security decisions.

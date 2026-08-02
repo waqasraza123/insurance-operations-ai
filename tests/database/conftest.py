@@ -9,7 +9,6 @@ from sqlalchemy.engine import Engine
 from insurance_operations.database.connection import create_database_engine
 from insurance_operations.settings import DatabaseSettings, RuntimeEnvironment
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 

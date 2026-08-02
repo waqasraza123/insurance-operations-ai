@@ -19,6 +19,7 @@ def build_database_settings(**overrides: object) -> DatabaseSettings:
         "app_environment": RuntimeEnvironment.DEVELOPMENT,
         "database_url": "postgresql://user:password@pooled.example/database",
         "direct_database_url": "postgresql://user:password@direct.example/database",
+        "test_database_url": None,
         "database_ssl_mode": DatabaseSslMode.REQUIRE,
     }
     values.update(overrides)
@@ -59,7 +60,14 @@ def test_migrations_disable_application_side_pooling() -> None:
     assert "pool_size" not in options
 
 
-def test_test_environment_requires_an_isolated_url() -> None:
+def test_test_environment_requires_an_isolated_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "TEST_DATABASE_URL",
+        "postgresql://leaked:secret@tests.example/leaked",
+    )
+
     with pytest.raises(ValidationError, match="TEST_DATABASE_URL is required"):
         build_database_settings(app_environment=RuntimeEnvironment.TEST)
 
@@ -86,12 +94,38 @@ def test_test_isolation_ignores_credentials_and_query() -> None:
         )
 
 
+def test_test_environment_rejects_the_direct_database() -> None:
+    direct_url = "postgresql://user:password@direct.example/database"
+    with pytest.raises(ValidationError, match="must be isolated"):
+        build_database_settings(
+            app_environment=RuntimeEnvironment.TEST,
+            test_database_url=direct_url,
+        )
+
+
+def test_test_environment_treats_pooled_and_direct_hosts_as_one_target() -> None:
+    with pytest.raises(ValidationError, match="must be isolated"):
+        build_database_settings(
+            app_environment=RuntimeEnvironment.TEST,
+            database_url=(
+                "postgresql://runtime:one@ep-example-pooler.neon.tech/shared"
+            ),
+            direct_database_url=None,
+            test_database_url=("postgresql://tests:two@ep-example.neon.tech/shared"),
+        )
+
+
 def test_production_rejects_disabled_ssl() -> None:
     with pytest.raises(ValidationError, match="SSL cannot be disabled"):
         build_database_settings(
             app_environment=RuntimeEnvironment.PRODUCTION,
             database_ssl_mode=DatabaseSslMode.DISABLE,
         )
+
+
+def test_unapproved_runtime_environment_is_rejected() -> None:
+    with pytest.raises(ValidationError, match="Input should be"):
+        build_database_settings(app_environment="staging")
 
 
 def test_non_postgresql_urls_are_rejected() -> None:

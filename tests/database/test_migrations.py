@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, inspect, select, update
+from sqlalchemy import func, insert, inspect, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
@@ -13,10 +13,8 @@ from insurance_operations.database.seed import (
 )
 from insurance_operations.settings import (
     DatabaseSettings,
-    DatabaseSslMode,
     RuntimeEnvironment,
 )
-
 
 EXPECTED_TABLES = {
     "agencies",
@@ -129,7 +127,7 @@ def test_migration_creates_only_the_approved_foundation_tables(
 ) -> None:
     table_names = set(inspect(migrated_database).get_table_names())
 
-    assert EXPECTED_TABLES <= table_names
+    assert table_names >= EXPECTED_TABLES
     assert table_names <= EXPECTED_TABLES | {"alembic_version"}
 
 
@@ -261,7 +259,7 @@ def test_row_version_and_membership_constraints_are_enforced(
     user_id = uuid4()
     with migrated_database.begin() as connection:
         connection.execute(
-            Agency.__table__.insert().values(
+            insert(Agency).values(
                 id=agency_id,
                 name="Constraint Agency",
                 slug=f"constraint-{agency_id}",
@@ -269,34 +267,32 @@ def test_row_version_and_membership_constraints_are_enforced(
             )
         )
         connection.execute(
-            AppUser.__table__.insert().values(
+            insert(AppUser).values(
                 id=user_id,
                 auth_subject=uuid4(),
                 display_name="Constraint User",
             )
         )
 
-    with pytest.raises(IntegrityError):
-        with migrated_database.begin() as connection:
-            connection.execute(
-                Agency.__table__.insert().values(
-                    id=uuid4(),
-                    name="Invalid Version",
-                    slug=f"invalid-{uuid4()}",
-                    environment_kind="DEVELOPMENT",
-                    row_version=0,
-                )
+    with pytest.raises(IntegrityError), migrated_database.begin() as connection:
+        connection.execute(
+            insert(Agency).values(
+                id=uuid4(),
+                name="Invalid Version",
+                slug=f"invalid-{uuid4()}",
+                environment_kind="DEVELOPMENT",
+                row_version=0,
             )
+        )
 
-    with pytest.raises(IntegrityError):
-        with migrated_database.begin() as connection:
-            connection.execute(
-                AgencyMembership.__table__.insert().values(
-                    agency_id=agency_id,
-                    app_user_id=user_id,
-                    status="UNKNOWN",
-                )
+    with pytest.raises(IntegrityError), migrated_database.begin() as connection:
+        connection.execute(
+            insert(AgencyMembership).values(
+                agency_id=agency_id,
+                app_user_id=user_id,
+                status="UNKNOWN",
             )
+        )
 
 
 def test_mutable_records_increment_row_version_on_update(
@@ -305,7 +301,7 @@ def test_mutable_records_increment_row_version_on_update(
     agency_id = uuid4()
     with migrated_database.begin() as connection:
         connection.execute(
-            Agency.__table__.insert().values(
+            insert(Agency).values(
                 id=agency_id,
                 name="Versioned Agency",
                 slug=f"versioned-{agency_id}",
@@ -322,12 +318,29 @@ def test_mutable_records_increment_row_version_on_update(
     assert row_version == 2
 
 
-def test_development_seed_is_idempotent(migrated_database: Engine) -> None:
-    settings = DatabaseSettings(
-        app_environment=RuntimeEnvironment.DEVELOPMENT,
-        database_url=migrated_database.url.render_as_string(hide_password=False),
-        database_ssl_mode=DatabaseSslMode.DISABLE,
+def test_development_seed_is_idempotent(
+    migrated_database: Engine,
+    database_settings: DatabaseSettings,
+) -> None:
+    settings = DatabaseSettings.model_validate(
+        {
+            "app_environment": RuntimeEnvironment.DEVELOPMENT,
+            "database_url": database_settings.runtime_database_url,
+            "direct_database_url": None,
+            "test_database_url": None,
+            "database_ssl_mode": database_settings.database_ssl_mode,
+            "database_pool_size": database_settings.database_pool_size,
+            "database_max_overflow": database_settings.database_max_overflow,
+            "database_pool_timeout_seconds": (
+                database_settings.database_pool_timeout_seconds
+            ),
+            "database_pool_recycle_seconds": (
+                database_settings.database_pool_recycle_seconds
+            ),
+        }
     )
+
+    assert settings.database_ssl_mode is database_settings.database_ssl_mode
 
     assert seed_development_agency(settings) is True
     assert seed_development_agency(settings) is False
@@ -349,8 +362,17 @@ def test_development_seed_is_idempotent(migrated_database: Engine) -> None:
     assert seeded_agency.environment_kind == "DEVELOPMENT"
 
 
+@pytest.mark.parametrize(
+    "environment",
+    [RuntimeEnvironment.TEST, RuntimeEnvironment.PRODUCTION],
+)
 def test_development_seed_refuses_non_development_environments(
     database_settings: DatabaseSettings,
+    environment: RuntimeEnvironment,
 ) -> None:
+    settings = database_settings.model_copy(
+        update={"app_environment": environment},
+    )
+
     with pytest.raises(ValueError, match="APP_ENVIRONMENT=development"):
-        seed_development_agency(database_settings)
+        seed_development_agency(settings)

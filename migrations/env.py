@@ -10,7 +10,6 @@ from insurance_operations.database.connection import (
 from insurance_operations.database.models import Base
 from insurance_operations.settings import DatabaseSettings
 
-
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

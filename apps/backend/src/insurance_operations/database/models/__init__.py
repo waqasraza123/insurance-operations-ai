@@ -35,6 +35,7 @@ TABLE_OWNERSHIP = {
 }
 
 __all__ = [
+    "TABLE_OWNERSHIP",
     "Agency",
     "AgencyMembership",
     "AppUser",
@@ -42,6 +43,5 @@ __all__ = [
     "Base",
     "Customer",
     "IdempotencyRecord",
-    "TABLE_OWNERSHIP",
     "TableOwnership",
 ]

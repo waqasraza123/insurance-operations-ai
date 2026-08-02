@@ -1,8 +1,7 @@
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
-from insurance_operations.database.models import Base, TABLE_OWNERSHIP
-
+from insurance_operations.database.models import TABLE_OWNERSHIP, Base
 
 EXPECTED_OWNERSHIP = {
     "agencies": ("identity", None),
