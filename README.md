@@ -62,7 +62,7 @@ Open `http://localhost:3000` and select **Test Voice AI**. Accept all three ackn
 
 ## Verify
 
-Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
+Export the repository-root `.env` into the current shell before web verification; the workspace build does not automatically load that file. Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
 
 ```bash
 npm run verify:web
@@ -77,7 +77,6 @@ APP_ENVIRONMENT=test pytest
 insurance-operations-worker --check
 ```
 
-Manual QA: verify disabled flags hide the route; deny microphone permission; force a disconnect; observe the 3:00 countdown; test mute/unmute; confirm the 11th daily authorization is rejected; retry one confirmation; inspect that no raw audio or draft transcript exists in PostgreSQL or logs; and verify provider audio saving/retention settings in the dashboard.
+Manual QA: verify disabled flags hide the route; deny microphone permission; force a disconnect while connecting and while active; confirm the ending state prevents retry until cleanup finishes; observe the 3:00 countdown; test mute/unmute; confirm the 11th daily authorization is rejected with clear guidance; retry one transient confirmation with the same idempotency key; confirm an expired session requires a new conversation; inspect that no raw audio or draft transcript exists in PostgreSQL or logs; and verify provider audio saving/retention settings in the dashboard.
 
 The approved Release 1 PDFs remain in `docs/release1/`. Read `AGENTS.md` and `docs/project-state.md` before changing architecture or scope.
-

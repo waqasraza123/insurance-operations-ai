@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import {
-  ConversationApiError,
   authorizeConversationSession,
   confirmConversationIntake,
   endConversationSession,
@@ -17,22 +16,23 @@ import type {
   ConversationSpeaker,
   ConversationTurn,
 } from "./contracts";
+import {
+  classifyConfirmationFailure,
+  startFailureMessage,
+} from "./failures";
+import {
+  classifyConnectionFailure,
+  isLiveConversationPhase,
+} from "./lifecycle";
+import type {
+  ConnectionFailureSource,
+  ConversationPhase,
+} from "./lifecycle";
 import { appendTranscript, validateConfirmation } from "./review";
 
 type VoiceTestProperties = Readonly<{
   apiBaseUrl: string;
 }>;
-
-type Phase =
-  | "idle"
-  | "requesting"
-  | "connecting"
-  | "active"
-  | "review_error"
-  | "review"
-  | "saving"
-  | "saved"
-  | "error";
 
 type IntakeForm = {
   fullName: string;
@@ -51,19 +51,31 @@ const EMPTY_FORM: IntakeForm = {
 export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
   const [transcript, setTranscript] = useState<ConversationTurn[]>([]);
   const [form, setForm] = useState<IntakeForm>(EMPTY_FORM);
-  const failureHandlerRef = useRef<() => void>(() => undefined);
-  const phaseRef = useRef<Phase>("idle");
+  const [phase, setPhaseState] = useState<ConversationPhase>("idle");
+  const [errorMessage, setErrorMessage] = useState<string>();
+  const phaseRef = useRef<ConversationPhase>("idle");
   const sessionIdRef = useRef<string | undefined>(undefined);
   const intentionalEndRef = useRef(false);
 
+  const setPhase = useCallback((nextPhase: ConversationPhase) => {
+    phaseRef.current = nextPhase;
+    setPhaseState(nextPhase);
+  }, []);
+
   const handleTranscript = useCallback(
     (speaker: ConversationSpeaker, text: string) => {
+      if (!isLiveConversationPhase(phaseRef.current)) {
+        return;
+      }
       setTranscript((current) => appendTranscript(current, speaker, text));
     },
     [],
   );
 
   const handleDraft = useCallback((draft: ConversationDraft) => {
+    if (!isLiveConversationPhase(phaseRef.current)) {
+      return;
+    }
     setForm((current) => ({
       fullName: draft.fullName ?? current.fullName,
       email: draft.email ?? current.email,
@@ -72,35 +84,65 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
     }));
   }, []);
 
+  const handleConnectionFailure = useCallback(
+    (source: ConnectionFailureSource) => {
+      const failure = classifyConnectionFailure({
+        intentionalEnd: intentionalEndRef.current,
+        phase: phaseRef.current,
+        sessionId: sessionIdRef.current,
+        source,
+      });
+      if (failure === undefined) {
+        return;
+      }
+
+      setErrorMessage(
+        "The live voice connection ended unexpectedly. Start a new session.",
+      );
+      setPhase("stopping");
+      void endConversationSession(
+        apiBaseUrl,
+        failure.sessionId,
+        failure.outcome,
+      )
+        .catch(() => undefined)
+        .finally(() => {
+          if (phaseRef.current === "stopping") {
+            setPhase("error");
+          }
+        });
+    },
+    [apiBaseUrl, setPhase],
+  );
+
   const handleDisconnect = useCallback(() => {
-    const sessionId = sessionIdRef.current;
-    if (
-      phaseRef.current !== "active" ||
-      sessionId === undefined ||
-      intentionalEndRef.current
-    ) {
-      return;
-    }
-    phaseRef.current = "error";
-    void endConversationSession(apiBaseUrl, sessionId, "INTERRUPTED").catch(
-      () => undefined,
-    );
-    failureHandlerRef.current();
-  }, [apiBaseUrl, intentionalEndRef]);
+    handleConnectionFailure("disconnect");
+  }, [handleConnectionFailure]);
 
   const handleError = useCallback(() => {
-    if (intentionalEndRef.current) {
-      return;
-    }
-    const sessionId = sessionIdRef.current;
-    if (phaseRef.current === "active" && sessionId !== undefined) {
-      void endConversationSession(apiBaseUrl, sessionId, "FAILED").catch(
-        () => undefined,
-      );
-    }
-    phaseRef.current = "error";
-    failureHandlerRef.current();
-  }, [apiBaseUrl, intentionalEndRef]);
+    handleConnectionFailure("provider_error");
+  }, [handleConnectionFailure]);
+
+  useEffect(() => {
+    return () => {
+      const failure = classifyConnectionFailure({
+        intentionalEnd: intentionalEndRef.current,
+        phase: phaseRef.current,
+        sessionId: sessionIdRef.current,
+        source: "disconnect",
+      });
+      if (failure === undefined) {
+        return;
+      }
+
+      phaseRef.current = "stopping";
+      void endConversationSession(
+        apiBaseUrl,
+        failure.sessionId,
+        failure.outcome,
+      ).catch(() => undefined);
+    };
+  }, [apiBaseUrl]);
 
   return (
     <ConfiguredConversationAdapter
@@ -113,12 +155,15 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
         <VoiceTestExperience
           apiBaseUrl={apiBaseUrl}
           client={client}
+          errorMessage={errorMessage}
           form={form}
-          failureHandlerRef={failureHandlerRef}
           intentionalEndRef={intentionalEndRef}
+          phase={phase}
           phaseRef={phaseRef}
           sessionIdRef={sessionIdRef}
+          setErrorMessage={setErrorMessage}
           setForm={setForm}
+          setPhase={setPhase}
           setTranscript={setTranscript}
           transcript={transcript}
         />
@@ -130,12 +175,15 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
 type ExperienceProperties = Readonly<{
   apiBaseUrl: string;
   client: ConversationClient;
-  failureHandlerRef: MutableRefObject<() => void>;
+  errorMessage: string | undefined;
   form: IntakeForm;
   intentionalEndRef: MutableRefObject<boolean>;
-  phaseRef: MutableRefObject<Phase>;
+  phase: ConversationPhase;
+  phaseRef: MutableRefObject<ConversationPhase>;
   sessionIdRef: MutableRefObject<string | undefined>;
+  setErrorMessage: Dispatch<SetStateAction<string | undefined>>;
   setForm: Dispatch<SetStateAction<IntakeForm>>;
+  setPhase: (phase: ConversationPhase) => void;
   setTranscript: Dispatch<SetStateAction<ConversationTurn[]>>;
   transcript: ConversationTurn[];
 }>;
@@ -143,36 +191,29 @@ type ExperienceProperties = Readonly<{
 function VoiceTestExperience({
   apiBaseUrl,
   client,
-  failureHandlerRef,
+  errorMessage,
   form,
   intentionalEndRef,
+  phase,
   phaseRef,
   sessionIdRef,
+  setErrorMessage,
   setForm,
+  setPhase,
   setTranscript,
   transcript,
 }: ExperienceProperties) {
-  const [phase, setPhaseState] = useState<Phase>("idle");
   const [disclosureAccepted, setDisclosureAccepted] = useState(false);
   const [microphoneConsent, setMicrophoneConsent] = useState(false);
   const [syntheticDataAcknowledged, setSyntheticDataAcknowledged] =
     useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(180);
   const [maximumDuration, setMaximumDuration] = useState(180);
-  const [errorMessage, setErrorMessage] = useState<string>();
   const [savedIntake, setSavedIntake] = useState<ConfirmedConversationIntake>();
   const [confirmationLocked, setConfirmationLocked] = useState(false);
   const confirmationKeyRef = useRef<string | undefined>(undefined);
   const finishConversationRef = useRef<() => Promise<void>>(
     async () => undefined,
-  );
-
-  const setPhase = useCallback(
-    (nextPhase: Phase) => {
-      phaseRef.current = nextPhase;
-      setPhaseState(nextPhase);
-    },
-    [phaseRef],
   );
 
   const finishConversation = useCallback(async () => {
@@ -181,6 +222,8 @@ function VoiceTestExperience({
       return;
     }
     intentionalEndRef.current = true;
+    setErrorMessage(undefined);
+    setPhase("stopping");
     try {
       if (client.status !== "disconnected") {
         await client.end();
@@ -208,25 +251,18 @@ function VoiceTestExperience({
     } finally {
       intentionalEndRef.current = false;
     }
-  }, [apiBaseUrl, client, intentionalEndRef, sessionIdRef, setPhase]);
+  }, [
+    apiBaseUrl,
+    client,
+    intentionalEndRef,
+    sessionIdRef,
+    setErrorMessage,
+    setPhase,
+  ]);
 
   useEffect(() => {
     finishConversationRef.current = finishConversation;
   }, [finishConversation]);
-
-  const handleConnectionFailure = useCallback(() => {
-    setErrorMessage(
-      "The live voice connection ended unexpectedly. Start a new session.",
-    );
-    setPhase("error");
-  }, [setPhase]);
-
-  useEffect(() => {
-    failureHandlerRef.current = handleConnectionFailure;
-    return () => {
-      failureHandlerRef.current = () => undefined;
-    };
-  }, [failureHandlerRef, handleConnectionFailure]);
 
   useEffect(() => {
     if (phase !== "active") {
@@ -273,20 +309,22 @@ function VoiceTestExperience({
       setRemainingSeconds(authorization.maximumDurationSeconds);
       setPhase("connecting");
       await client.start(authorization.credential);
-      if (phaseRef.current === "error") {
+      if (phaseRef.current === "stopping" || phaseRef.current === "error") {
         throw new Error("voice connection failed during startup");
       }
       setPhase("active");
-    } catch {
+    } catch (error) {
+      if (phaseRef.current === "stopping" || phaseRef.current === "error") {
+        return;
+      }
       const sessionId = sessionIdRef.current;
       if (sessionId !== undefined) {
+        setPhase("stopping");
         await endConversationSession(apiBaseUrl, sessionId, "FAILED").catch(
           () => undefined,
         );
       }
-      setErrorMessage(
-        "The microphone or voice service is unavailable. Check access and try again.",
-      );
+      setErrorMessage(startFailureMessage(error));
       setPhase("error");
     }
   }
@@ -319,17 +357,13 @@ function VoiceTestExperience({
       setSavedIntake(result);
       setPhase("saved");
     } catch (error) {
-      if (
-        error instanceof ConversationApiError &&
-        (error.status === 400 || error.status === 422)
-      ) {
+      const failure = classifyConfirmationFailure(error);
+      if (failure.action === "correct_input") {
         confirmationKeyRef.current = undefined;
         setConfirmationLocked(false);
       }
-      setErrorMessage(
-        "The confirmed intake was not saved. Review the fields and retry safely.",
-      );
-      setPhase("review");
+      setErrorMessage(failure.message);
+      setPhase(failure.action === "start_new_session" ? "error" : "review");
     }
   }
 
@@ -344,7 +378,9 @@ function VoiceTestExperience({
     setPhase("idle");
   }
 
-  const isBusy = ["requesting", "connecting", "saving"].includes(phase);
+  const isBusy = ["requesting", "connecting", "stopping", "saving"].includes(
+    phase,
+  );
   const canStart = phase === "idle" || phase === "error";
 
   return (
@@ -447,7 +483,11 @@ function VoiceTestExperience({
         <p className="voice-status" aria-live="polite">
           {statusLabel(phase, client.mode, remainingSeconds)}
         </p>
-        {errorMessage && <p className="error-message">{errorMessage}</p>}
+        {errorMessage && (
+          <p className="error-message" role="alert">
+            {errorMessage}
+          </p>
+        )}
       </section>
 
       <section className="voice-card" aria-labelledby="transcript-title">
@@ -466,7 +506,9 @@ function VoiceTestExperience({
                   <textarea
                     aria-label={`Transcript turn ${index + 1}`}
                     disabled={
+                      phase === "connecting" ||
                       phase === "active" ||
+                      phase === "stopping" ||
                       phase === "saving" ||
                       phase === "saved" ||
                       confirmationLocked
@@ -596,7 +638,7 @@ function FormField({
 }
 
 function statusLabel(
-  phase: Phase,
+  phase: ConversationPhase,
   mode: "speaking" | "listening" | undefined,
   remainingSeconds: number,
 ): string {
@@ -604,11 +646,12 @@ function statusLabel(
     const activity = mode === "speaking" ? "AI is speaking" : "AI is listening";
     return `${activity} · ${formatDuration(remainingSeconds)} remaining`;
   }
-  const labels: Record<Phase, string> = {
+  const labels: Record<ConversationPhase, string> = {
     idle: "Ready to request microphone access",
     requesting: "Requesting microphone access and authorization…",
     connecting: "Connecting securely…",
     active: "Conversation active",
+    stopping: "Ending the conversation securely…",
     review_error: "Conversation ended · review preparation needs a retry",
     review: "Conversation ended · review required before saving",
     saving: "Saving confirmed intake…",

@@ -31,6 +31,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 - Use `conversation_sessions` and `conversation_intakes`; provider names never appear in business table or API names.
 - Use ElevenLabs two-way WebRTC with a server-minted short-lived token and server-only API key.
 - Limit each session to 180 seconds, each agency to one concurrent session, and each UTC day to ten authorizations.
+- Bound browser conversation API requests to 15 seconds; connection failures enter a cleanup state before retry and terminal confirmation failures require a new session.
 - Make confirmed intakes immutable and confirmation idempotent; customer, intake, audit, and session confirmation share one transaction.
 - Use a forward Alembic revision for conversation tables because the verified initial migration is an established baseline.
 - Keep production identity/authentication deferred to a separately approved specification.
@@ -39,6 +40,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 Production authentication, real customer use, complete customer management, telephony, raw-audio storage, provider fallback, uploads, Storage, durable jobs, Document AI, OCR, review/approval UI, email, deployment configuration, and remaining business tables.
 
 ## Risks / Watchouts
+- Backlog item 6 lifecycle hardening and its focused frontend tests are implemented but not yet owner-verified.
 - Task 006 backend checks and migration remain unverified locally under the owner testing policy; `npm run verify:web` passes with the documented public environment values.
 - `package.json` adds the ElevenLabs React SDK; the lockfile must be regenerated and reviewed before `npm ci` can verify the web app.
 - Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.

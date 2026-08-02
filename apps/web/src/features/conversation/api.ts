@@ -10,6 +10,8 @@ type ErrorBody = Readonly<{
   }>;
 }>;
 
+const REQUEST_TIMEOUT_MILLISECONDS = 15_000;
+
 export class ConversationApiError extends Error {
   readonly status: number;
 
@@ -28,6 +30,7 @@ export async function authorizeConversationSession(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
       body: JSON.stringify({
         ai_disclosure_accepted: true,
         microphone_consent_granted: true,
@@ -78,6 +81,8 @@ export async function endConversationSession(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
       body: JSON.stringify({ outcome }),
     },
   );
@@ -116,6 +121,7 @@ export async function confirmConversationIntake(
         "Content-Type": "application/json",
         "Idempotency-Key": input.idempotencyKey,
       },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MILLISECONDS),
       body: JSON.stringify({
         conversation_session_id: input.sessionId,
         customer: {
