@@ -60,46 +60,83 @@ def archived_at_column() -> sa.Column[object]:
 
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+    op.execute(
+        """
+        CREATE FUNCTION set_mutable_record_metadata()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+            NEW.updated_at = clock_timestamp();
+            NEW.row_version = OLD.row_version + 1;
+            RETURN NEW;
+        END;
+        $$
+        """
+    )
 
     op.create_table(
         "agencies",
         uuid_primary_key(),
-        sa.Column("name", sa.String(length=200), nullable=False),
+        sa.Column("name", sa.Text(), nullable=False),
+        sa.Column("slug", sa.Text(), nullable=False),
+        sa.Column("environment_kind", sa.Text(), nullable=False),
         created_at_column(),
         updated_at_column(),
         row_version_column(),
         archived_at_column(),
         sa.CheckConstraint(
-            "length(btrim(name)) > 0",
-            name="ck_agencies_name_not_blank",
+            "length(btrim(name)) BETWEEN 1 AND 160",
+            name="ck_agencies_name_length_valid",
+        ),
+        sa.CheckConstraint(
+            "length(btrim(slug)) > 0 AND slug = lower(slug)",
+            name="ck_agencies_slug_lowercase",
+        ),
+        sa.CheckConstraint(
+            "environment_kind IN ('DEVELOPMENT', 'DEMO', 'PRODUCTION')",
+            name="ck_agencies_environment_kind_valid",
         ),
         sa.CheckConstraint(
             "row_version > 0",
             name="ck_agencies_row_version_positive",
         ),
+        sa.UniqueConstraint("slug", name="uq_agencies_slug"),
+    )
+    op.create_index(
+        "ix_agencies_environment_kind",
+        "agencies",
+        ["environment_kind"],
     )
 
     op.create_table(
         "app_users",
         uuid_primary_key(),
-        sa.Column("auth_subject", sa.String(length=255), nullable=False),
-        sa.Column("email", sa.String(length=320), nullable=True),
-        sa.Column("display_name", sa.String(length=200), nullable=True),
+        sa.Column("auth_subject", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("display_name", sa.Text(), nullable=False),
+        sa.Column("email_snapshot", sa.Text(), nullable=True),
+        sa.Column(
+            "status",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'ACTIVE'"),
+        ),
         created_at_column(),
         updated_at_column(),
         row_version_column(),
-        archived_at_column(),
+        sa.Column("disabled_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
-            "length(btrim(auth_subject)) > 0",
-            name="ck_app_users_auth_subject_not_blank",
+            "length(btrim(display_name)) BETWEEN 1 AND 160",
+            name="ck_app_users_display_name_length_valid",
         ),
         sa.CheckConstraint(
-            "email IS NULL OR length(btrim(email)) > 0",
-            name="ck_app_users_email_not_blank",
+            "status IN ('ACTIVE', 'DISABLED')",
+            name="ck_app_users_status_valid",
         ),
         sa.CheckConstraint(
-            "display_name IS NULL OR length(btrim(display_name)) > 0",
-            name="ck_app_users_display_name_not_blank",
+            "(status = 'ACTIVE' AND disabled_at IS NULL) OR "
+            "(status = 'DISABLED' AND disabled_at IS NOT NULL)",
+            name="ck_app_users_disabled_at_consistent",
         ),
         sa.CheckConstraint(
             "row_version > 0",
@@ -128,13 +165,14 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.String(length=20),
+            sa.Text(),
             nullable=False,
             server_default=sa.text("'ACTIVE'"),
         ),
         created_at_column(),
         updated_at_column(),
         row_version_column(),
+        sa.Column("deactivated_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
             "status IN ('ACTIVE', 'INACTIVE')",
             name="ck_agency_memberships_status_valid",
@@ -149,12 +187,6 @@ def upgrade() -> None:
             name="uq_agency_memberships_agency_user",
         ),
     )
-    op.create_index(
-        "ix_agency_memberships_user_status",
-        "agency_memberships",
-        ["app_user_id", "status"],
-    )
-
     op.create_table(
         "customers",
         uuid_primary_key(),
@@ -164,28 +196,27 @@ def upgrade() -> None:
             sa.ForeignKey("agencies.id", ondelete="RESTRICT"),
             nullable=False,
         ),
-        sa.Column("full_name", sa.String(length=200), nullable=False),
-        sa.Column("email", sa.String(length=320), nullable=True),
-        sa.Column("phone", sa.String(length=50), nullable=True),
-        sa.Column("address_line1", sa.String(length=200), nullable=True),
-        sa.Column("address_line2", sa.String(length=200), nullable=True),
-        sa.Column("address_city", sa.String(length=100), nullable=True),
-        sa.Column("address_state_code", sa.String(length=2), nullable=True),
-        sa.Column("address_postal_code", sa.String(length=20), nullable=True),
+        sa.Column("demo_session_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("full_name", sa.Text(), nullable=False),
+        sa.Column("normalized_name", sa.Text(), nullable=False),
+        sa.Column("email", sa.Text(), nullable=True),
+        sa.Column("normalized_email", sa.Text(), nullable=True),
+        sa.Column("phone", sa.Text(), nullable=True),
+        sa.Column("normalized_phone", sa.Text(), nullable=True),
+        sa.Column("address_line1", sa.Text(), nullable=True),
+        sa.Column("address_line2", sa.Text(), nullable=True),
+        sa.Column("city", sa.Text(), nullable=True),
+        sa.Column("state_code", sa.Text(), nullable=True),
+        sa.Column("postal_code", sa.Text(), nullable=True),
         sa.Column(
-            "search_text",
+            "country_code",
             sa.Text(),
             nullable=False,
-            server_default=sa.text("''"),
+            server_default=sa.text("'US'"),
         ),
+        sa.Column("search_text", sa.Text(), nullable=False),
         sa.Column(
             "created_by",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("app_users.id", ondelete="RESTRICT"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_by",
             postgresql.UUID(as_uuid=True),
             sa.ForeignKey("app_users.id", ondelete="RESTRICT"),
             nullable=False,
@@ -195,20 +226,16 @@ def upgrade() -> None:
         row_version_column(),
         archived_at_column(),
         sa.CheckConstraint(
-            "length(btrim(full_name)) > 0",
-            name="ck_customers_full_name_not_blank",
+            "length(btrim(full_name)) BETWEEN 1 AND 200",
+            name="ck_customers_full_name_length_valid",
         ),
         sa.CheckConstraint(
-            "email IS NULL OR length(btrim(email)) > 0",
-            name="ck_customers_email_not_blank",
+            "state_code IS NULL OR length(state_code) = 2",
+            name="ck_customers_state_code_length_valid",
         ),
         sa.CheckConstraint(
-            "phone IS NULL OR length(btrim(phone)) > 0",
-            name="ck_customers_phone_not_blank",
-        ),
-        sa.CheckConstraint(
-            "address_state_code IS NULL OR address_state_code ~ '^[A-Z]{2}$'",
-            name="ck_customers_state_code_valid",
+            "length(country_code) = 2",
+            name="ck_customers_country_code_length_valid",
         ),
         sa.CheckConstraint(
             "row_version > 0",
@@ -237,22 +264,32 @@ def upgrade() -> None:
             sa.ForeignKey("agencies.id", ondelete="RESTRICT"),
             nullable=False,
         ),
-        sa.Column("actor_type", sa.String(length=40), nullable=False),
+        sa.Column("demo_session_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("actor_type", sa.Text(), nullable=False),
         sa.Column(
             "actor_user_id",
             postgresql.UUID(as_uuid=True),
             sa.ForeignKey("app_users.id", ondelete="RESTRICT"),
             nullable=True,
         ),
-        sa.Column("event_type", sa.String(length=100), nullable=False),
-        sa.Column("target_type", sa.String(length=100), nullable=False),
-        sa.Column("target_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("summary", sa.String(length=500), nullable=False),
+        sa.Column("event_type", sa.Text(), nullable=False),
+        sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
-            "event_data",
+            "customer_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("customers.id", ondelete="RESTRICT"),
+            nullable=True,
+        ),
+        sa.Column("document_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("attempt_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("review_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("policy_version_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("email_delivery_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("summary", sa.Text(), nullable=False),
+        sa.Column(
+            "details",
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=False,
-            server_default=sa.text("'{}'::jsonb"),
         ),
         sa.Column(
             "correlation_id",
@@ -267,20 +304,8 @@ def upgrade() -> None:
         ),
         created_at_column(),
         sa.CheckConstraint(
-            "length(btrim(actor_type)) > 0",
-            name="ck_audit_events_actor_type_not_blank",
-        ),
-        sa.CheckConstraint(
-            "length(btrim(event_type)) > 0",
-            name="ck_audit_events_event_type_not_blank",
-        ),
-        sa.CheckConstraint(
-            "length(btrim(target_type)) > 0",
-            name="ck_audit_events_target_type_not_blank",
-        ),
-        sa.CheckConstraint(
-            "length(btrim(summary)) > 0",
-            name="ck_audit_events_summary_not_blank",
+            "actor_type IN ('STAFF', 'DEMO_USER', 'SYSTEM', 'WORKER')",
+            name="ck_audit_events_actor_type_valid",
         ),
         sa.CheckConstraint(
             "event_version > 0",
@@ -288,19 +313,19 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_audit_events_agency_created",
+        "ix_audit_events_customer_occurred",
         "audit_events",
-        ["agency_id", sa.text("created_at DESC"), "id"],
+        ["customer_id", sa.text("occurred_at DESC"), "id"],
     )
     op.create_index(
-        "ix_audit_events_target_created",
+        "ix_audit_events_document_occurred",
         "audit_events",
-        ["target_type", "target_id", sa.text("created_at DESC")],
+        ["document_id", sa.text("occurred_at DESC"), "id"],
     )
     op.create_index(
-        "ix_audit_events_correlation",
+        "ix_audit_events_policy_version_occurred",
         "audit_events",
-        ["correlation_id"],
+        ["policy_version_id", sa.text("occurred_at DESC"), "id"],
     )
 
     op.create_table(
@@ -312,84 +337,69 @@ def upgrade() -> None:
             sa.ForeignKey("agencies.id", ondelete="RESTRICT"),
             nullable=False,
         ),
-        sa.Column("environment_kind", sa.String(length=30), nullable=False),
-        sa.Column("actor_identifier", sa.String(length=255), nullable=False),
-        sa.Column("route_key", sa.String(length=200), nullable=False),
-        sa.Column("idempotency_key", sa.String(length=128), nullable=False),
-        sa.Column("request_hash", sa.String(length=64), nullable=False),
+        sa.Column("demo_session_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("actor_scope_type", sa.Text(), nullable=False),
+        sa.Column("actor_scope_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("route_key", sa.Text(), nullable=False),
+        sa.Column("idempotency_key", sa.Text(), nullable=False),
+        sa.Column("request_fingerprint", sa.Text(), nullable=False),
         sa.Column(
             "status",
-            sa.String(length=20),
+            sa.Text(),
             nullable=False,
             server_default=sa.text("'IN_PROGRESS'"),
         ),
-        sa.Column("response_status_code", sa.Integer(), nullable=True),
+        sa.Column("response_status", sa.Integer(), nullable=True),
         sa.Column(
             "response_body",
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=True,
         ),
-        sa.Column("resource_type", sa.String(length=100), nullable=True),
+        sa.Column("resource_type", sa.Text(), nullable=True),
         sa.Column("resource_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column(
-            "expires_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-        ),
+        sa.Column("failure_code", sa.Text(), nullable=True),
+        created_at_column(),
         sa.Column(
             "completed_at",
             sa.DateTime(timezone=True),
             nullable=True,
         ),
-        created_at_column(),
-        updated_at_column(),
-        row_version_column(),
-        sa.CheckConstraint(
-            "length(btrim(environment_kind)) > 0",
-            name="ck_idempotency_records_environment_not_blank",
-        ),
-        sa.CheckConstraint(
-            "length(btrim(actor_identifier)) > 0",
-            name="ck_idempotency_records_actor_identifier_not_blank",
-        ),
-        sa.CheckConstraint(
-            "length(btrim(route_key)) > 0",
-            name="ck_idempotency_records_route_key_not_blank",
+        sa.Column(
+            "expires_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
         ),
         sa.CheckConstraint(
             "length(idempotency_key) BETWEEN 1 AND 128",
             name="ck_idempotency_records_key_length_valid",
         ),
         sa.CheckConstraint(
-            "length(request_hash) = 64",
-            name="ck_idempotency_records_request_hash_valid",
-        ),
-        sa.CheckConstraint(
             "status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')",
             name="ck_idempotency_records_status_valid",
         ),
-        sa.CheckConstraint(
-            "response_status_code IS NULL OR response_status_code BETWEEN 100 AND 599",
-            name="ck_idempotency_records_response_status_valid",
-        ),
-        sa.CheckConstraint(
-            "row_version > 0",
-            name="ck_idempotency_records_row_version_positive",
-        ),
         sa.UniqueConstraint(
-            "agency_id",
-            "environment_kind",
-            "actor_identifier",
+            "actor_scope_type",
+            "actor_scope_id",
             "route_key",
             "idempotency_key",
             name="uq_idempotency_records_scope",
         ),
     )
-    op.create_index(
-        "ix_idempotency_records_expiry",
-        "idempotency_records",
-        ["expires_at", "status"],
-    )
+
+    for table_name in (
+        "agencies",
+        "app_users",
+        "agency_memberships",
+        "customers",
+    ):
+        op.execute(
+            f"""
+            CREATE TRIGGER trg_{table_name}_mutable_record_metadata
+            BEFORE UPDATE ON {table_name}
+            FOR EACH ROW
+            EXECUTE FUNCTION set_mutable_record_metadata()
+            """
+        )
 
 
 def downgrade() -> None:
@@ -399,3 +409,4 @@ def downgrade() -> None:
     op.drop_table("agency_memberships")
     op.drop_table("app_users")
     op.drop_table("agencies")
+    op.execute("DROP FUNCTION set_mutable_record_metadata()")

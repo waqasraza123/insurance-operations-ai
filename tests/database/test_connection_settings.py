@@ -73,6 +73,19 @@ def test_test_environment_rejects_the_runtime_database() -> None:
         )
 
 
+def test_test_isolation_ignores_credentials_and_query() -> None:
+    with pytest.raises(ValidationError, match="must be isolated"):
+        build_database_settings(
+            app_environment=RuntimeEnvironment.TEST,
+            database_url=(
+                "postgresql://runtime:one@database.example/shared?sslmode=require"
+            ),
+            test_database_url=(
+                "postgresql://tests:two@database.example/shared?application_name=tests"
+            ),
+        )
+
+
 def test_production_rejects_disabled_ssl() -> None:
     with pytest.raises(ValidationError, match="SSL cannot be disabled"):
         build_database_settings(

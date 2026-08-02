@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from insurance_operations.database.models.base import (
@@ -21,18 +21,17 @@ class Customer(
 ):
     __tablename__ = "customers"
     __table_args__ = (
-        CheckConstraint("length(btrim(full_name)) > 0", name="full_name_not_blank"),
         CheckConstraint(
-            "email IS NULL OR length(btrim(email)) > 0",
-            name="email_not_blank",
+            "length(btrim(full_name)) BETWEEN 1 AND 200",
+            name="full_name_length_valid",
         ),
         CheckConstraint(
-            "phone IS NULL OR length(btrim(phone)) > 0",
-            name="phone_not_blank",
+            "state_code IS NULL OR length(state_code) = 2",
+            name="state_code_length_valid",
         ),
         CheckConstraint(
-            "address_state_code IS NULL OR address_state_code ~ '^[A-Z]{2}$'",
-            name="state_code_valid",
+            "length(country_code) = 2",
+            name="country_code_length_valid",
         ),
         CheckConstraint("row_version > 0", name="row_version_positive"),
     )
@@ -41,25 +40,29 @@ class Customer(
         ForeignKey("agencies.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
-    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    address_line1: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    address_line2: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    address_city: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    address_state_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
-    address_postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    search_text: Mapped[str] = mapped_column(
+    demo_session_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    full_name: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_name: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalized_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    normalized_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address_line2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(Text, nullable=True)
+    state_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    country_code: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-        default="",
-        server_default="",
+        default="US",
+        server_default="US",
     )
+    search_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[UUID] = mapped_column(
-        ForeignKey("app_users.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    updated_by: Mapped[UUID] = mapped_column(
         ForeignKey("app_users.id", ondelete="RESTRICT"),
         nullable=False,
     )

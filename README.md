@@ -31,7 +31,7 @@ alembic upgrade head
 insurance-operations-seed-development
 ```
 
-The seed is idempotent and refuses to run unless `APP_ENVIRONMENT=development`.
+The seed is idempotent, creates the approved development agency identity, and refuses to run unless `APP_ENVIRONMENT=development`.
 
 ## Start
 

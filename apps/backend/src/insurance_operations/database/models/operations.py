@@ -3,13 +3,12 @@ from enum import StrEnum
 from uuid import UUID
 
 from sqlalchemy import (
-    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
-    String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
@@ -17,12 +16,14 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from insurance_operations.database.models.base import (
-    Base,
-    TimestampedMixin,
-    UuidPrimaryKeyMixin,
-    VersionedMixin,
-)
+from insurance_operations.database.models.base import Base, UuidPrimaryKeyMixin
+
+
+class AuditActorType(StrEnum):
+    STAFF = "STAFF"
+    DEMO_USER = "DEMO_USER"
+    SYSTEM = "SYSTEM"
+    WORKER = "WORKER"
 
 
 class IdempotencyStatus(StrEnum):
@@ -34,10 +35,10 @@ class IdempotencyStatus(StrEnum):
 class AuditEvent(UuidPrimaryKeyMixin, Base):
     __tablename__ = "audit_events"
     __table_args__ = (
-        CheckConstraint("length(btrim(actor_type)) > 0", name="actor_type_not_blank"),
-        CheckConstraint("length(btrim(event_type)) > 0", name="event_type_not_blank"),
-        CheckConstraint("length(btrim(target_type)) > 0", name="target_type_not_blank"),
-        CheckConstraint("length(btrim(summary)) > 0", name="summary_not_blank"),
+        CheckConstraint(
+            "actor_type IN ('STAFF', 'DEMO_USER', 'SYSTEM', 'WORKER')",
+            name="actor_type_valid",
+        ),
         CheckConstraint("event_version > 0", name="event_version_positive"),
     )
 
@@ -45,21 +46,46 @@ class AuditEvent(UuidPrimaryKeyMixin, Base):
         ForeignKey("agencies.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    actor_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    demo_session_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    actor_type: Mapped[str] = mapped_column(Text, nullable=False)
     actor_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("app_users.id", ondelete="RESTRICT"),
         nullable=True,
     )
-    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    target_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    target_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    summary: Mapped[str] = mapped_column(String(500), nullable=False)
-    event_data: Mapped[dict[str, object]] = mapped_column(
-        JSONB,
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
-        default=dict,
-        server_default="{}",
     )
+    customer_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("customers.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    document_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    attempt_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    review_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    policy_version_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    email_delivery_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    details: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     correlation_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     event_version: Mapped[int] = mapped_column(
         Integer,
@@ -75,89 +101,82 @@ class AuditEvent(UuidPrimaryKeyMixin, Base):
 
 
 Index(
-    "ix_audit_events_agency_created",
-    AuditEvent.agency_id,
-    AuditEvent.created_at.desc(),
+    "ix_audit_events_customer_occurred",
+    AuditEvent.customer_id,
+    AuditEvent.occurred_at.desc(),
     AuditEvent.id,
 )
 Index(
-    "ix_audit_events_target_created",
-    AuditEvent.target_type,
-    AuditEvent.target_id,
-    AuditEvent.created_at.desc(),
+    "ix_audit_events_document_occurred",
+    AuditEvent.document_id,
+    AuditEvent.occurred_at.desc(),
+    AuditEvent.id,
 )
-Index("ix_audit_events_correlation", AuditEvent.correlation_id)
+Index(
+    "ix_audit_events_policy_version_occurred",
+    AuditEvent.policy_version_id,
+    AuditEvent.occurred_at.desc(),
+    AuditEvent.id,
+)
 
 
-class IdempotencyRecord(
-    UuidPrimaryKeyMixin,
-    TimestampedMixin,
-    VersionedMixin,
-    Base,
-):
+class IdempotencyRecord(UuidPrimaryKeyMixin, Base):
     __tablename__ = "idempotency_records"
     __table_args__ = (
-        CheckConstraint(
-            "length(btrim(environment_kind)) > 0",
-            name="environment_not_blank",
-        ),
-        CheckConstraint(
-            "length(btrim(actor_identifier)) > 0",
-            name="actor_identifier_not_blank",
-        ),
-        CheckConstraint("length(btrim(route_key)) > 0", name="route_key_not_blank"),
         CheckConstraint(
             "length(idempotency_key) BETWEEN 1 AND 128",
             name="key_length_valid",
         ),
-        CheckConstraint("length(request_hash) = 64", name="request_hash_valid"),
         CheckConstraint(
             "status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')",
             name="status_valid",
         ),
-        CheckConstraint(
-            "response_status_code IS NULL OR response_status_code BETWEEN 100 AND 599",
-            name="response_status_valid",
-        ),
-        CheckConstraint("row_version > 0", name="row_version_positive"),
         UniqueConstraint(
-            "agency_id",
-            "environment_kind",
-            "actor_identifier",
+            "actor_scope_type",
+            "actor_scope_id",
             "route_key",
             "idempotency_key",
             name="uq_idempotency_records_scope",
         ),
-        Index("ix_idempotency_records_expiry", "expires_at", "status"),
     )
 
     agency_id: Mapped[UUID] = mapped_column(
         ForeignKey("agencies.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    environment_kind: Mapped[str] = mapped_column(String(30), nullable=False)
-    actor_identifier: Mapped[str] = mapped_column(String(255), nullable=False)
-    route_key: Mapped[str] = mapped_column(String(200), nullable=False)
-    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    demo_session_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    actor_scope_type: Mapped[str] = mapped_column(Text, nullable=False)
+    actor_scope_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    route_key: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
-        String(20),
+        Text,
         nullable=False,
         default=IdempotencyStatus.IN_PROGRESS.value,
         server_default=IdempotencyStatus.IN_PROGRESS.value,
     )
-    response_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     response_body: Mapped[dict[str, object] | None] = mapped_column(
         JSONB,
         nullable=True,
     )
-    resource_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    resource_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     resource_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
-    expires_at: Mapped[datetime] = mapped_column(
+    failure_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
+        server_default=func.now(),
     )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
     )

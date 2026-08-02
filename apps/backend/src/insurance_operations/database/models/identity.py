@@ -1,7 +1,15 @@
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from insurance_operations.database.models.base import (
@@ -18,6 +26,17 @@ class MembershipStatus(StrEnum):
     INACTIVE = "INACTIVE"
 
 
+class AgencyEnvironment(StrEnum):
+    DEVELOPMENT = "DEVELOPMENT"
+    DEMO = "DEMO"
+    PRODUCTION = "PRODUCTION"
+
+
+class AppUserStatus(StrEnum):
+    ACTIVE = "ACTIVE"
+    DISABLED = "DISABLED"
+
+
 class Agency(
     UuidPrimaryKeyMixin,
     TimestampedMixin,
@@ -27,41 +46,66 @@ class Agency(
 ):
     __tablename__ = "agencies"
     __table_args__ = (
-        CheckConstraint("length(btrim(name)) > 0", name="name_not_blank"),
+        CheckConstraint(
+            "length(btrim(name)) BETWEEN 1 AND 160",
+            name="name_length_valid",
+        ),
+        CheckConstraint(
+            "length(btrim(slug)) > 0 AND slug = lower(slug)",
+            name="slug_lowercase",
+        ),
+        CheckConstraint(
+            "environment_kind IN ('DEVELOPMENT', 'DEMO', 'PRODUCTION')",
+            name="environment_kind_valid",
+        ),
         CheckConstraint("row_version > 0", name="row_version_positive"),
+        UniqueConstraint("slug", name="uq_agencies_slug"),
+        Index("ix_agencies_environment_kind", "environment_kind"),
     )
 
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    environment_kind: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class AppUser(
     UuidPrimaryKeyMixin,
     TimestampedMixin,
     VersionedMixin,
-    ArchivableMixin,
     Base,
 ):
     __tablename__ = "app_users"
     __table_args__ = (
         CheckConstraint(
-            "length(btrim(auth_subject)) > 0",
-            name="auth_subject_not_blank",
+            "length(btrim(display_name)) BETWEEN 1 AND 160",
+            name="display_name_length_valid",
         ),
         CheckConstraint(
-            "email IS NULL OR length(btrim(email)) > 0",
-            name="email_not_blank",
+            "status IN ('ACTIVE', 'DISABLED')",
+            name="status_valid",
         ),
         CheckConstraint(
-            "display_name IS NULL OR length(btrim(display_name)) > 0",
-            name="display_name_not_blank",
+            "(status = 'ACTIVE' AND disabled_at IS NULL) OR "
+            "(status = 'DISABLED' AND disabled_at IS NOT NULL)",
+            name="disabled_at_consistent",
         ),
         CheckConstraint("row_version > 0", name="row_version_positive"),
         UniqueConstraint("auth_subject", name="uq_app_users_auth_subject"),
     )
 
-    auth_subject: Mapped[str] = mapped_column(String(255), nullable=False)
-    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
-    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    auth_subject: Mapped[UUID] = mapped_column(nullable=False)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    email_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=AppUserStatus.ACTIVE.value,
+        server_default=AppUserStatus.ACTIVE.value,
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 
 class AgencyMembership(
@@ -82,7 +126,6 @@ class AgencyMembership(
             "app_user_id",
             name="uq_agency_memberships_agency_user",
         ),
-        Index("ix_agency_memberships_user_status", "app_user_id", "status"),
     )
 
     agency_id: Mapped[UUID] = mapped_column(
@@ -94,8 +137,12 @@ class AgencyMembership(
         nullable=False,
     )
     status: Mapped[str] = mapped_column(
-        String(20),
+        Text,
         nullable=False,
         default=MembershipStatus.ACTIVE.value,
         server_default=MembershipStatus.ACTIVE.value,
+    )
+    deactivated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
     )

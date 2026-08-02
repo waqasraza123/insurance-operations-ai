@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, MetaData, Uuid, func
+from sqlalchemy import BigInteger, DateTime, FetchedValue, MetaData, Uuid, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -36,7 +36,7 @@ class TimestampedMixin:
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        server_onupdate=FetchedValue(),
     )
 
 

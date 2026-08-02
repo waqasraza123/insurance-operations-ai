@@ -40,3 +40,37 @@ def test_agency_owned_tables_use_restrictive_foreign_keys(
 
         assert len(agency_foreign_keys) == 1
         assert agency_foreign_keys[0]["options"]["ondelete"] == "RESTRICT"
+
+
+def test_foundation_relationships_match_available_parent_tables(
+    migrated_database: Engine,
+) -> None:
+    database_inspector = inspect(migrated_database)
+    expected_relationships: dict[str, set[tuple[tuple[str, ...], str]]] = {
+        "agencies": set(),
+        "app_users": set(),
+        "agency_memberships": {
+            (("agency_id",), "agencies"),
+            (("app_user_id",), "app_users"),
+        },
+        "customers": {
+            (("agency_id",), "agencies"),
+            (("created_by",), "app_users"),
+        },
+        "audit_events": {
+            (("agency_id",), "agencies"),
+            (("actor_user_id",), "app_users"),
+            (("customer_id",), "customers"),
+        },
+        "idempotency_records": {(("agency_id",), "agencies")},
+    }
+
+    actual_relationships = {
+        table_name: {
+            (tuple(foreign_key["constrained_columns"]), foreign_key["referred_table"])
+            for foreign_key in database_inspector.get_foreign_keys(table_name)
+        }
+        for table_name in expected_relationships
+    }
+
+    assert actual_relationships == expected_relationships

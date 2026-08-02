@@ -6,11 +6,13 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from insurance_operations.database.connection import create_database_engine
 from insurance_operations.database.models import Agency
+from insurance_operations.database.models.identity import AgencyEnvironment
 from insurance_operations.settings import DatabaseSettings, RuntimeEnvironment
 
 
 DEVELOPMENT_AGENCY_ID = UUID("00000000-0000-4000-8000-000000000001")
 DEVELOPMENT_AGENCY_NAME = "Development Agency"
+DEVELOPMENT_AGENCY_SLUG = "development-agency"
 
 
 def seed_development_agency(settings: DatabaseSettings) -> bool:
@@ -24,6 +26,8 @@ def seed_development_agency(settings: DatabaseSettings) -> bool:
             .values(
                 id=DEVELOPMENT_AGENCY_ID,
                 name=DEVELOPMENT_AGENCY_NAME,
+                slug=DEVELOPMENT_AGENCY_SLUG,
+                environment_kind=AgencyEnvironment.DEVELOPMENT.value,
             )
             .on_conflict_do_nothing(index_elements=[Agency.id])
             .returning(Agency.id)

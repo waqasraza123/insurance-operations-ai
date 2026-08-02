@@ -71,8 +71,8 @@ class DatabaseSettings(CommonSettings):
         if (
             self.app_environment is RuntimeEnvironment.TEST
             and self.test_database_url is not None
-            and make_url(self.test_database_url).set(drivername="postgresql")
-            == make_url(self.database_url).set(drivername="postgresql")
+            and database_target(self.test_database_url)
+            == database_target(self.database_url)
         ):
             raise ValueError("TEST_DATABASE_URL must be isolated from DATABASE_URL")
         if (
@@ -104,3 +104,12 @@ class ApiSettings(DatabaseSettings):
 
 class WorkerSettings(DatabaseSettings):
     worker_name: str = Field(min_length=1, max_length=100)
+
+
+def database_target(value: str) -> tuple[str | None, int, str | None]:
+    parsed_url = make_url(value)
+    return (
+        parsed_url.host.lower() if parsed_url.host is not None else None,
+        parsed_url.port or 5432,
+        parsed_url.database,
+    )
