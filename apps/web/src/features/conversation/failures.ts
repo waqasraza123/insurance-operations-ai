@@ -1,9 +1,7 @@
 import { ConversationApiError } from "./api";
 
 export type ConfirmationFailureAction =
-  | "correct_input"
-  | "retry_confirmation"
-  | "start_new_session";
+  "correct_input" | "retry_confirmation" | "start_new_session";
 
 export type ConfirmationFailure = Readonly<{
   action: ConfirmationFailureAction;
@@ -46,7 +44,8 @@ export function classifyConfirmationFailure(
   ) {
     return {
       action: "start_new_session",
-      message: "This conversation can no longer be confirmed. Start a new session.",
+      message:
+        "This conversation can no longer be confirmed. Start a new session.",
     };
   }
 

@@ -40,9 +40,7 @@ class ElevenLabsConversationProvider:
                 headers={"xi-api-key": self._api_key},
             )
             response.raise_for_status()
-            token_response = ConversationTokenResponse.model_validate(
-                response.json()
-            )
+            token_response = ConversationTokenResponse.model_validate(response.json())
         except (httpx.HTTPError, ValidationError, ValueError) as error:
             raise ConversationProviderError(
                 "conversation provider authorization failed"

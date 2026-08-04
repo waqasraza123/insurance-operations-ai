@@ -37,7 +37,7 @@ from insurance_operations.settings import (
 )
 
 type JsonValue = (
-    None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+    bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 )
 type JsonObject = dict[str, JsonValue]
 
@@ -221,14 +221,15 @@ def test_confirmed_intake_is_owned_audited_transactional_and_idempotent(
     assert second[2]["idempotent-replayed"] == "true"
     with Session(migrated_database) as session:
         customer_count = session.scalar(
-            select(func.count()).select_from(Customer).where(
-                Customer.agency_id == development_conversation_api.agency_id
-            )
+            select(func.count())
+            .select_from(Customer)
+            .where(Customer.agency_id == development_conversation_api.agency_id)
         )
         intake_count = session.scalar(
-            select(func.count()).select_from(ConversationIntake).where(
-                ConversationIntake.agency_id
-                == development_conversation_api.agency_id
+            select(func.count())
+            .select_from(ConversationIntake)
+            .where(
+                ConversationIntake.agency_id == development_conversation_api.agency_id
             )
         )
         audit_events = session.scalars(
@@ -244,16 +245,14 @@ def test_confirmed_intake_is_owned_audited_transactional_and_idempotent(
     assert conversation_session is not None
     assert conversation_session.status == ConversationSessionStatus.CONFIRMED.value
     assert all(
-        "synthetic@example.test" not in str(event.details)
-        for event in audit_events
+        "synthetic@example.test" not in str(event.details) for event in audit_events
     )
 
     with pytest.raises(DBAPIError), migrated_database.begin() as connection:
         connection.execute(
             update(ConversationIntake)
             .where(
-                ConversationIntake.agency_id
-                == development_conversation_api.agency_id
+                ConversationIntake.agency_id == development_conversation_api.agency_id
             )
             .values(intake_intent="Mutated intent")
         )
@@ -306,9 +305,7 @@ def test_session_authorizations_are_limited_to_ten_per_utc_day(
     development_conversation_api: DevelopmentConversationApi,
 ) -> None:
     for _index in range(10):
-        status_code, body, _headers = authorize_session(
-            development_conversation_api
-        )
+        status_code, body, _headers = authorize_session(development_conversation_api)
         assert status_code == 201
         session_id = body["session_id"]
         assert isinstance(session_id, str)

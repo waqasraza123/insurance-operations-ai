@@ -61,4 +61,3 @@ def test_provider_returns_sanitized_error_for_invalid_response() -> None:
 
     assert str(error.value) == "conversation provider authorization failed"
     assert "server-only-secret" not in str(error.value)
-

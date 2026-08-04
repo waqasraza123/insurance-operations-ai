@@ -16,18 +16,12 @@ import type {
   ConversationSpeaker,
   ConversationTurn,
 } from "./contracts";
-import {
-  classifyConfirmationFailure,
-  startFailureMessage,
-} from "./failures";
+import { classifyConfirmationFailure, startFailureMessage } from "./failures";
 import {
   classifyConnectionFailure,
   isLiveConversationPhase,
 } from "./lifecycle";
-import type {
-  ConnectionFailureSource,
-  ConversationPhase,
-} from "./lifecycle";
+import type { ConnectionFailureSource, ConversationPhase } from "./lifecycle";
 import { appendTranscript, validateConfirmation } from "./review";
 
 type VoiceTestProperties = Readonly<{
@@ -123,26 +117,28 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
     handleConnectionFailure("provider_error");
   }, [handleConnectionFailure]);
 
-  useEffect(() => {
-    return () => {
-      const failure = classifyConnectionFailure({
-        intentionalEnd: intentionalEndRef.current,
-        phase: phaseRef.current,
-        sessionId: sessionIdRef.current,
-        source: "disconnect",
-      });
-      if (failure === undefined) {
-        return;
-      }
+  const cleanupActiveSession = useCallback(() => {
+    const failure = classifyConnectionFailure({
+      intentionalEnd: intentionalEndRef.current,
+      phase: phaseRef.current,
+      sessionId: sessionIdRef.current,
+      source: "disconnect",
+    });
+    if (failure === undefined) {
+      return;
+    }
 
-      phaseRef.current = "stopping";
-      void endConversationSession(
-        apiBaseUrl,
-        failure.sessionId,
-        failure.outcome,
-      ).catch(() => undefined);
-    };
+    phaseRef.current = "stopping";
+    void endConversationSession(
+      apiBaseUrl,
+      failure.sessionId,
+      failure.outcome,
+    ).catch(() => undefined);
   }, [apiBaseUrl]);
+
+  useEffect(() => {
+    return cleanupActiveSession;
+  }, [cleanupActiveSession]);
 
   return (
     <ConfiguredConversationAdapter
@@ -394,13 +390,13 @@ function VoiceTestExperience({
           coverage, or make decisions.
         </p>
         <div className="disclosure" role="note">
-          You are interacting with an AI, not a human. Your microphone audio
-          and conversation are recorded during the session and may be shared
-          with ElevenLabs and third-party AI/LLM providers for processing. Use
-          fictional test data only—never real customer or sensitive
-          information. This app does not retain raw audio or a live draft
-          transcript. Intake details and transcript text are saved only after
-          you review and explicitly confirm them.
+          You are interacting with an AI, not a human. Your microphone audio and
+          conversation are recorded during the session and may be shared with
+          ElevenLabs and third-party AI/LLM providers for processing. Use
+          fictional test data only—never real customer or sensitive information.
+          This app does not retain raw audio or a live draft transcript. Intake
+          details and transcript text are saved only after you review and
+          explicitly confirm them.
         </div>
         <label className="consent-row">
           <input

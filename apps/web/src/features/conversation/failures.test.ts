@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ConversationApiError } from "./api";
-import {
-  classifyConfirmationFailure,
-  startFailureMessage,
-} from "./failures";
+import { classifyConfirmationFailure, startFailureMessage } from "./failures";
 
 describe("conversation failure recovery", () => {
   it("gives actionable authorization guidance for bounded limits", () => {
@@ -30,7 +27,8 @@ describe("conversation failure recovery", () => {
       classifyConfirmationFailure(new ConversationApiError(410, "expired")),
     ).toEqual({
       action: "start_new_session",
-      message: "This conversation can no longer be confirmed. Start a new session.",
+      message:
+        "This conversation can no longer be confirmed. Start a new session.",
     });
     expect(classifyConfirmationFailure(new TypeError("network error"))).toEqual(
       {
