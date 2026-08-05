@@ -190,7 +190,7 @@ def test_confirmed_intake_is_owned_audited_transactional_and_idempotent(
         "conversation_session_id": session_id,
         "customer": {
             "full_name": "Synthetic Sample Customer",
-            "email": "synthetic@example.test",
+            "email": "synthetic@example.com",
         },
         "intake_intent": "Explore a synthetic renters insurance scenario.",
         "transcript": [
@@ -245,7 +245,7 @@ def test_confirmed_intake_is_owned_audited_transactional_and_idempotent(
     assert conversation_session is not None
     assert conversation_session.status == ConversationSessionStatus.CONFIRMED.value
     assert all(
-        "synthetic@example.test" not in str(event.details) for event in audit_events
+        "synthetic@example.com" not in str(event.details) for event in audit_events
     )
 
     with pytest.raises(DBAPIError), migrated_database.begin() as connection:

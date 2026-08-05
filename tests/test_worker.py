@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
 from sqlalchemy.engine import Engine
 
@@ -18,7 +18,7 @@ def test_worker_readiness_reports_database_identity() -> None:
         test_database_url="postgresql://user:password@localhost/test",
         database_ssl_mode=DatabaseSslMode.DISABLE,
     )
-    database_engine = Mock(spec=Engine)
+    database_engine = MagicMock(spec=Engine)
     connection = database_engine.connect.return_value.__enter__.return_value
     connection.scalar.return_value = 1
 

@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.engine import Engine
@@ -47,7 +47,7 @@ def test_health_reports_api_liveness() -> None:
 
 
 def test_ready_reports_database_readiness() -> None:
-    database_engine = Mock(spec=Engine)
+    database_engine = MagicMock(spec=Engine)
     connection = database_engine.connect.return_value.__enter__.return_value
     connection.scalar.return_value = 1
 
