@@ -4,7 +4,7 @@ Next.js frontend, FastAPI API, separate Python worker, and shared Neon PostgreSQ
 
 ## Setup
 
-Requires Node.js 22 and Python 3.13.
+Requires Node.js 26 and Python 3.13.
 
 ```bash
 cp .env.example .env

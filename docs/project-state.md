@@ -26,6 +26,7 @@ Verified Neon foundation; Supabase removal and development actor; generic conver
 
 ## Important Decisions
 - Use Next.js/TypeScript, FastAPI/Python 3.13, SQLAlchemy 2, psycopg 3, Alembic, and Neon PostgreSQL.
+- Require Node.js 26 for the web workspace and CI; the pinned Next.js 16.2.12 package supports Node.js >=20.9.0 and the pinned ElevenLabs React 1.12.0 package has no restrictive Node.js engine.
 - Use one repository with independently runnable web, API, and worker identities; avoid unnecessary monorepo tooling.
 - Seed one deterministic development agency, actor, and active membership only in development.
 - Use `conversation_sessions` and `conversation_intakes`; provider names never appear in business table or API names.
@@ -44,7 +45,7 @@ Production authentication, real customer use, complete customer management, tele
 ## Risks / Watchouts
 - Backlog item 6 lifecycle hardening and its focused frontend tests are implemented but not yet owner-verified.
 - Task 006 backend checks and migration remain unverified locally under the owner testing policy; `npm run verify:web` passes with the documented public environment values.
-- `package.json` adds the ElevenLabs React SDK; the lockfile must be regenerated and reviewed before `npm ci` can verify the web app.
+- The web workspace uses pinned Next.js 16.2.12 and ElevenLabs React 1.12.0 dependencies; both are installed and verified under Node.js 26.
 - Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.
 - The Release 1A synthetic-demo disclosure is owner-approved and implemented; provider region, LLM, STT, TTS, voice, privacy controls, and billing controls still require owner selection and dashboard verification before enabling the feature flags.
 - Browser transcript callbacks can contain evolving recognition text; the UI de-duplicates adjacent updates and explicit review remains mandatory.
