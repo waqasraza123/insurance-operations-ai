@@ -4,13 +4,22 @@ import pytest
 from sqlalchemy import func, insert, inspect, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from insurance_operations.database.models import Agency, AgencyMembership, AppUser
+from insurance_operations.database.models import (
+    Agency,
+    AgencyApprovedFaq,
+    AgencyMembership,
+    AgencyReceptionistSettings,
+    AppUser,
+)
 from insurance_operations.database.seed import (
     DEVELOPMENT_ACTOR_USER_ID,
     DEVELOPMENT_AGENCY_ID,
     DEVELOPMENT_AGENCY_SLUG,
+    DEVELOPMENT_APPROVED_FAQ_IDS,
     DEVELOPMENT_MEMBERSHIP_ID,
+    DEVELOPMENT_RECEPTIONIST_SETTINGS_ID,
     seed_development_foundation,
 )
 from insurance_operations.settings import (
@@ -27,6 +36,14 @@ EXPECTED_TABLES = {
     "idempotency_records",
     "conversation_sessions",
     "conversation_intakes",
+    "agency_receptionist_settings",
+    "agency_approved_faqs",
+    "agency_leads",
+    "lead_handoff_requests",
+    "agency_call_policies",
+    "agency_inbound_numbers",
+    "inbound_calls",
+    "inbound_call_events",
 }
 
 EXPECTED_COLUMNS = {
@@ -155,6 +172,130 @@ EXPECTED_COLUMNS = {
         "confirmed_at",
         "created_at",
     },
+    "agency_receptionist_settings": {
+        "id",
+        "agency_id",
+        "public_name",
+        "greeting",
+        "office_hours",
+        "contact_email",
+        "contact_phone",
+        "supported_insurance_categories",
+        "escalation_message",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "agency_approved_faqs": {
+        "id",
+        "agency_id",
+        "question",
+        "normalized_question",
+        "approved_answer",
+        "status",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "agency_leads": {
+        "id",
+        "agency_id",
+        "customer_id",
+        "conversation_intake_id",
+        "status",
+        "urgency",
+        "summary",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "lead_handoff_requests": {
+        "id",
+        "agency_id",
+        "lead_id",
+        "conversation_session_id",
+        "inbound_call_id",
+        "request_kind",
+        "preferred_contact_method",
+        "reason",
+        "availability",
+        "transfer_attempted",
+        "status",
+        "created_by",
+        "updated_by",
+        "completed_at",
+        "cancelled_at",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "agency_call_policies": {
+        "id",
+        "agency_id",
+        "inbound_enabled",
+        "timezone",
+        "availability_windows",
+        "transfer_enabled",
+        "transfer_destination_e164",
+        "transfer_ring_timeout_seconds",
+        "max_concurrent_calls",
+        "daily_call_limit",
+        "callback_fallback_enabled",
+        "after_hours_message",
+        "unavailable_message",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "agency_inbound_numbers": {
+        "id",
+        "agency_id",
+        "phone_number_e164",
+        "label",
+        "status",
+        "created_by",
+        "updated_by",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "inbound_calls": {
+        "id",
+        "agency_id",
+        "inbound_number_id",
+        "lead_id",
+        "status",
+        "caller_number_e164",
+        "adapter_name",
+        "source_call_reference",
+        "adapter_metadata",
+        "policy_snapshot",
+        "received_at",
+        "answered_at",
+        "ended_at",
+        "failure_code",
+        "created_at",
+        "updated_at",
+        "row_version",
+    },
+    "inbound_call_events": {
+        "id",
+        "agency_id",
+        "inbound_call_id",
+        "event_key",
+        "event_type",
+        "occurred_at",
+        "details",
+        "created_at",
+    },
 }
 
 
@@ -203,6 +344,35 @@ def test_migration_creates_only_the_documented_foundation_indexes(
         index["name"]
         for index in database_inspector.get_indexes("conversation_intakes")
     }
+    receptionist_settings_indexes = {
+        index["name"]
+        for index in database_inspector.get_indexes("agency_receptionist_settings")
+    }
+    approved_faq_indexes = {
+        index["name"]
+        for index in database_inspector.get_indexes("agency_approved_faqs")
+    }
+    lead_indexes = {
+        index["name"] for index in database_inspector.get_indexes("agency_leads")
+    }
+    handoff_indexes = {
+        index["name"]
+        for index in database_inspector.get_indexes("lead_handoff_requests")
+    }
+    call_policy_indexes = {
+        index["name"]
+        for index in database_inspector.get_indexes("agency_call_policies")
+    }
+    inbound_number_indexes = {
+        index["name"]
+        for index in database_inspector.get_indexes("agency_inbound_numbers")
+    }
+    inbound_call_indexes = {
+        index["name"] for index in database_inspector.get_indexes("inbound_calls")
+    }
+    inbound_call_event_indexes = {
+        index["name"] for index in database_inspector.get_indexes("inbound_call_events")
+    }
 
     assert agency_indexes == {
         "ix_agencies_environment_kind",
@@ -226,6 +396,35 @@ def test_migration_creates_only_the_documented_foundation_indexes(
         "ix_conversation_intakes_customer_confirmed",
         "uq_conversation_intakes_session",
     }
+    assert receptionist_settings_indexes == {"uq_agency_receptionist_settings_agency"}
+    assert approved_faq_indexes == {
+        "ix_agency_approved_faqs_agency_status",
+        "uq_agency_approved_faqs_agency_question",
+    }
+    assert lead_indexes == {
+        "ix_agency_leads_agency_status_created",
+        "ix_agency_leads_customer_created",
+        "uq_agency_leads_conversation_intake",
+    }
+    assert handoff_indexes == {
+        "ix_handoff_requests_agency_status",
+        "ix_handoff_requests_lead_created",
+        "uq_handoff_requests_inbound_call",
+    }
+    assert call_policy_indexes == {"uq_agency_call_policies_agency"}
+    assert inbound_number_indexes == {
+        "ix_inbound_numbers_agency_status",
+        "uq_agency_inbound_numbers_phone",
+    }
+    assert inbound_call_indexes == {
+        "ix_inbound_calls_agency_status_created",
+        "ix_inbound_calls_number_created",
+        "uq_inbound_calls_adapter_reference",
+    }
+    assert inbound_call_event_indexes == {
+        "ix_inbound_call_events_call_occurred",
+        "uq_inbound_call_events_call_key",
+    }
 
 
 def test_migration_unique_constraints_match_the_approved_scopes(
@@ -248,6 +447,14 @@ def test_migration_unique_constraints_match_the_approved_scopes(
         },
         "conversation_sessions": set(),
         "conversation_intakes": {("conversation_session_id",)},
+        "agency_receptionist_settings": {("agency_id",)},
+        "agency_approved_faqs": {("agency_id", "normalized_question")},
+        "agency_leads": {("conversation_intake_id",)},
+        "lead_handoff_requests": {("inbound_call_id",)},
+        "agency_call_policies": {("agency_id",)},
+        "agency_inbound_numbers": {("phone_number_e164",)},
+        "inbound_calls": {("adapter_name", "source_call_reference")},
+        "inbound_call_events": {("inbound_call_id", "event_key")},
     }
     actual_unique_columns = {
         table_name: {
@@ -306,6 +513,76 @@ def test_migration_check_constraints_cover_approved_invariants(
             "ck_conversation_intakes_confirmation_source_valid",
             "ck_conversation_intakes_intake_intent_length_valid",
             "ck_conversation_intakes_transcript_array_valid",
+        },
+        "agency_receptionist_settings": {
+            "ck_agency_receptionist_settings_public_name_length_valid",
+            "ck_agency_receptionist_settings_greeting_length_valid",
+            "ck_agency_receptionist_settings_office_hours_length_valid",
+            "ck_agency_receptionist_settings_contact_email_length_valid",
+            "ck_agency_receptionist_settings_contact_phone_length_valid",
+            "ck_agency_receptionist_settings_contact_method_required",
+            "ck_agency_receptionist_settings_supported_categories_valid",
+            "ck_agency_receptionist_settings_escalation_message_length_valid",
+            "ck_agency_receptionist_settings_row_version_positive",
+        },
+        "agency_approved_faqs": {
+            "ck_agency_approved_faqs_question_length_valid",
+            "ck_agency_approved_faqs_normalized_question_valid",
+            "ck_agency_approved_faqs_answer_length_valid",
+            "ck_agency_approved_faqs_status_valid",
+            "ck_agency_approved_faqs_row_version_positive",
+        },
+        "agency_leads": {
+            "ck_agency_leads_status_valid",
+            "ck_agency_leads_urgency_valid",
+            "ck_agency_leads_summary_length_valid",
+            "ck_agency_leads_row_version_positive",
+        },
+        "lead_handoff_requests": {
+            "ck_lead_handoff_requests_request_kind_valid",
+            "ck_lead_handoff_requests_contact_method_valid",
+            "ck_lead_handoff_requests_reason_length_valid",
+            "ck_lead_handoff_requests_availability_length_valid",
+            "ck_lead_handoff_requests_status_valid",
+            "ck_lead_handoff_requests_completed_at_consistent",
+            "ck_lead_handoff_requests_cancelled_at_consistent",
+            "ck_lead_handoff_requests_row_version_positive",
+        },
+        "agency_call_policies": {
+            "ck_agency_call_policies_timezone_length_valid",
+            "ck_agency_call_policies_transfer_number_length_valid",
+            "ck_agency_call_policies_transfer_destination_required",
+            "ck_agency_call_policies_ring_timeout_valid",
+            "ck_agency_call_policies_concurrent_limit_valid",
+            "ck_agency_call_policies_daily_limit_valid",
+            "ck_agency_call_policies_availability_windows_array",
+            "ck_agency_call_policies_after_hours_message_valid",
+            "ck_agency_call_policies_unavailable_message_valid",
+            "ck_agency_call_policies_row_version_positive",
+        },
+        "agency_inbound_numbers": {
+            "ck_agency_inbound_numbers_phone_number_length_valid",
+            "ck_agency_inbound_numbers_label_length_valid",
+            "ck_agency_inbound_numbers_status_valid",
+            "ck_agency_inbound_numbers_row_version_positive",
+        },
+        "inbound_calls": {
+            "ck_inbound_calls_status_valid",
+            "ck_inbound_calls_caller_number_length_valid",
+            "ck_inbound_calls_adapter_name_length_valid",
+            "ck_inbound_calls_source_reference_length_valid",
+            "ck_inbound_calls_failure_code_length_valid",
+            "ck_inbound_calls_answered_time_valid",
+            "ck_inbound_calls_ended_time_valid",
+            "ck_inbound_calls_failure_code_consistent",
+            "ck_inbound_calls_adapter_metadata_object",
+            "ck_inbound_calls_policy_snapshot_object",
+            "ck_inbound_calls_row_version_positive",
+        },
+        "inbound_call_events": {
+            "ck_inbound_call_events_event_type_length_valid",
+            "ck_inbound_call_events_event_key_length_valid",
+            "ck_inbound_call_events_details_object",
         },
     }
     actual_constraint_names = {
@@ -415,9 +692,27 @@ def test_development_seed_is_idempotent(
     assert first_result.agency_created is True
     assert first_result.actor_created is True
     assert first_result.membership_created is True
+    assert first_result.receptionist_settings_created is True
+    assert first_result.approved_faqs_created == 3
     assert second_result.agency_created is False
     assert second_result.actor_created is False
     assert second_result.membership_created is False
+    assert second_result.receptionist_settings_created is False
+    assert second_result.approved_faqs_created == 0
+
+    with Session(migrated_database) as session:
+        receptionist_settings = session.get(
+            AgencyReceptionistSettings,
+            DEVELOPMENT_RECEPTIONIST_SETTINGS_ID,
+        )
+        approved_faq_count = session.scalar(
+            select(func.count())
+            .select_from(AgencyApprovedFaq)
+            .where(AgencyApprovedFaq.id.in_(DEVELOPMENT_APPROVED_FAQ_IDS))
+        )
+
+    assert receptionist_settings is not None
+    assert approved_faq_count == 3
 
     with migrated_database.connect() as connection:
         seeded_agency = connection.execute(
