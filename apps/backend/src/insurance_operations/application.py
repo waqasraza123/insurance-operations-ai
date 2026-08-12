@@ -86,6 +86,7 @@ from insurance_operations.telephony import (
     InboundNumberStatusInput,
     TelephonyService,
 )
+from insurance_operations.telephony.routes import create_development_telephony_router
 
 
 class HealthResponse(BaseModel):
@@ -150,6 +151,13 @@ def create_app(
         allow_methods=["GET", "POST", "PUT"],
         allow_headers=["Content-Type", "Idempotency-Key", "X-Correlation-ID"],
         expose_headers=["Idempotent-Replayed", "X-Correlation-ID"],
+    )
+
+    application.include_router(
+        create_development_telephony_router(
+            settings=settings,
+            session_factory=session_factory,
+        )
     )
 
     @application.exception_handler(ApiError)

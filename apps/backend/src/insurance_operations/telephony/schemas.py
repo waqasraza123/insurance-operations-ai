@@ -1,7 +1,7 @@
-from itertools import pairwise
 import re
 from datetime import datetime, time
 from enum import StrEnum
+from itertools import pairwise
 from typing import Self
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError

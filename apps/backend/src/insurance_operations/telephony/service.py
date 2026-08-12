@@ -234,6 +234,31 @@ class TelephonyService:
         request: InboundCallReceiveInput,
         correlation_id: UUID,
     ) -> InboundCallActionResponse:
+        return self._receive_call(
+            actor=actor,
+            request=request,
+            correlation_id=correlation_id,
+        )
+
+    def receive_provider_call(
+        self,
+        *,
+        request: InboundCallReceiveInput,
+        correlation_id: UUID,
+    ) -> InboundCallActionResponse:
+        return self._receive_call(
+            actor=None,
+            request=request,
+            correlation_id=correlation_id,
+        )
+
+    def _receive_call(
+        self,
+        *,
+        actor: ActorContext | None,
+        request: InboundCallReceiveInput,
+        correlation_id: UUID,
+    ) -> InboundCallActionResponse:
         with self._session_factory() as session, session.begin():
             existing = session.scalar(
                 select(InboundCall).where(
@@ -241,55 +266,90 @@ class TelephonyService:
                     InboundCall.source_call_reference == request.source_call_reference,
                 )
             )
+
             if existing is not None:
-                validate_receive_replay(session, actor, request, existing)
+                expected_agency_id = (
+                    actor.agency_id if actor is not None else existing.agency_id
+                )
+                validate_receive_replay(
+                    session,
+                    expected_agency_id,
+                    request,
+                    existing,
+                    compare_occurred_at=actor is not None,
+                )
                 return replay_receive_response(existing)
 
-            number = session.scalar(
-                select(AgencyInboundNumber).where(
-                    AgencyInboundNumber.agency_id == actor.agency_id,
-                    AgencyInboundNumber.phone_number_e164 == request.called_number_e164,
-                    AgencyInboundNumber.status == InboundNumberStatus.ACTIVE.value,
-                )
-            )
+            number_filters = [
+                AgencyInboundNumber.phone_number_e164 == request.called_number_e164,
+                AgencyInboundNumber.status == InboundNumberStatus.ACTIVE.value,
+            ]
+
+            if actor is not None:
+                number_filters.append(AgencyInboundNumber.agency_id == actor.agency_id)
+
+            number = session.scalar(select(AgencyInboundNumber).where(*number_filters))
+
             if number is None:
                 raise ApiError(
                     status_code=404,
                     code="INBOUND_ROUTE_NOT_FOUND",
                     message="No active inbound route matches the called number",
                 )
+
+            agency_id = number.agency_id
+
             policy = session.scalar(
                 select(AgencyCallPolicy)
-                .where(AgencyCallPolicy.agency_id == actor.agency_id)
+                .where(AgencyCallPolicy.agency_id == agency_id)
                 .with_for_update()
             )
+
             if policy is None or not policy.inbound_enabled:
                 raise ApiError(
                     status_code=409,
                     code="INBOUND_CALLS_DISABLED",
                     message="Inbound calls are disabled for this agency",
                 )
+
             existing = session.scalar(
                 select(InboundCall).where(
                     InboundCall.adapter_name == request.adapter_name,
                     InboundCall.source_call_reference == request.source_call_reference,
                 )
             )
+
             if existing is not None:
-                validate_receive_replay(session, actor, request, existing)
+                validate_receive_replay(
+                    session,
+                    agency_id,
+                    request,
+                    existing,
+                    compare_occurred_at=actor is not None,
+                )
                 return replay_receive_response(existing)
-            enforce_call_limits(session, actor.agency_id, policy, request.occurred_at)
+
+            enforce_call_limits(
+                session,
+                agency_id,
+                policy,
+                request.occurred_at,
+            )
+
             inbound_call = InboundCall(
-                agency_id=actor.agency_id,
+                agency_id=agency_id,
                 inbound_number_id=number.id,
                 status=InboundCallStatus.RECEIVED.value,
                 caller_number_e164=request.caller_number_e164,
                 adapter_name=request.adapter_name,
                 source_call_reference=request.source_call_reference,
-                adapter_metadata={"adapter_version": request.adapter_version},
+                adapter_metadata={
+                    "adapter_version": request.adapter_version,
+                },
                 policy_snapshot=policy_snapshot(policy),
                 received_at=request.occurred_at,
             )
+
             try:
                 with session.begin_nested():
                     session.add(inbound_call)
@@ -302,23 +362,47 @@ class TelephonyService:
                         == request.source_call_reference,
                     )
                 )
+
                 if existing is None:
                     raise
-                validate_receive_replay(session, actor, request, existing)
+
+                validate_receive_replay(
+                    session,
+                    agency_id,
+                    request,
+                    existing,
+                    compare_occurred_at=actor is not None,
+                )
                 return replay_receive_response(existing)
+
             session.refresh(inbound_call)
+
             session.add(
                 InboundCallEvent(
-                    agency_id=actor.agency_id,
+                    agency_id=agency_id,
                     inbound_call_id=inbound_call.id,
                     event_key="call-received",
                     event_type="CALL_RECEIVED",
                     occurred_at=request.occurred_at,
-                    details={"resulting_status": inbound_call.status},
+                    details={
+                        "resulting_status": inbound_call.status,
+                    },
                 )
             )
-            session.add(
-                telephony_audit(
+
+            if actor is None:
+                audit_event = telephony_system_audit(
+                    agency_id=agency_id,
+                    event_type="INBOUND_CALL_RECEIVED",
+                    summary="Inbound call received",
+                    details={
+                        "inbound_call_id": str(inbound_call.id),
+                        "inbound_number_id": str(number.id),
+                    },
+                    correlation_id=correlation_id,
+                )
+            else:
+                audit_event = telephony_audit(
                     actor=actor,
                     event_type="INBOUND_CALL_RECEIVED",
                     summary="Inbound call received",
@@ -328,8 +412,13 @@ class TelephonyService:
                     },
                     correlation_id=correlation_id,
                 )
+
+            session.add(audit_event)
+
+            return call_action_response(
+                inbound_call,
+                action=CallAction.ANSWER_AI,
             )
-            return call_action_response(inbound_call, action=CallAction.ANSWER_AI)
 
     def list_calls(
         self,
@@ -923,18 +1012,30 @@ def callback_contact_method(customer: Customer) -> HandoffContactMethod:
 
 def validate_receive_replay(
     session: Session,
-    actor: ActorContext,
+    expected_agency_id: UUID,
     request: InboundCallReceiveInput,
     inbound_call: InboundCall,
+    *,
+    compare_occurred_at: bool,
 ) -> None:
-    number = session.get(AgencyInboundNumber, inbound_call.inbound_number_id)
-    if (
-        inbound_call.agency_id != actor.agency_id
+    number = session.get(
+        AgencyInboundNumber,
+        inbound_call.inbound_number_id,
+    )
+    adapter_version = inbound_call.adapter_metadata.get("adapter_version")
+
+    replay_mismatch = (
+        inbound_call.agency_id != expected_agency_id
         or inbound_call.caller_number_e164 != request.caller_number_e164
-        or inbound_call.received_at != request.occurred_at
         or number is None
         or number.phone_number_e164 != request.called_number_e164
-    ):
+        or adapter_version != request.adapter_version
+    )
+
+    if compare_occurred_at and inbound_call.received_at != request.occurred_at:
+        replay_mismatch = True
+
+    if replay_mismatch:
         raise ApiError(
             status_code=409,
             code="INBOUND_CALL_REFERENCE_REUSED",
@@ -1015,6 +1116,27 @@ def version_conflict(resource: str, current: int) -> ApiError:
         code=f"{resource}_VERSION_CONFLICT",
         message="The resource was changed by another request",
         details={"current_row_version": current},
+    )
+
+
+def telephony_system_audit(
+    *,
+    agency_id: UUID,
+    event_type: str,
+    summary: str,
+    details: dict[str, object],
+    correlation_id: UUID,
+) -> AuditEvent:
+    return AuditEvent(
+        agency_id=agency_id,
+        actor_type=AuditActorType.SYSTEM.value,
+        actor_user_id=None,
+        event_type=event_type,
+        occurred_at=datetime.now(UTC),
+        summary=summary,
+        details=details,
+        correlation_id=correlation_id,
+        event_version=1,
     )
 
 

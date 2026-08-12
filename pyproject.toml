@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings==2.14.2",
     "psycopg[binary]>=3.3.2,<4",
     "SQLAlchemy>=2.0.46,<2.1",
+    "twilio==9.10.9",
     "uvicorn==0.52.1",
 ]
 
@@ -58,3 +59,7 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-config --strict-markers"
+
+[[tool.mypy.overrides]]
+module = ["twilio", "twilio.*"]
+ignore_missing_imports = true
