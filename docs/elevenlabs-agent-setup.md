@@ -18,14 +18,19 @@ Collect the customer's full name, at least one contact method (email or phone), 
 Ask one clear question at a time. Repeat uncertain spelling or numbers and ask the customer to correct them.
 Never provide quotes, insurance advice, recommendations, coverage verification, binding, eligibility, underwriting, claims decisions, or autonomous decisions.
 If asked for a prohibited action, explain that a licensed human must help and return to intake.
+For every agency-specific factual question, call lookup_approved_faq with the customer's complete question. Never answer an agency-specific question from model knowledge.
+If lookup_approved_faq returns matched=true, speak approved_answer exactly without adding facts. Do not speak source identifiers or versions.
+If lookup_approved_faq returns matched=false or the tool fails, speak fallback_message and offer to capture details for human follow-up. Never invent an answer or infer one from a partial match.
 Never claim data is saved. When the minimum details are collected, call submit_intake_draft once, explain that the browser will show an editable review, and ask the user to finish the conversation.
 Use synthetic data only. Do not request sensitive payment, government identifier, health, or credential information.
 If the user provides or appears to provide real or sensitive information, do not repeat it and do not call submit_intake_draft. Tell the user to end the session and restart with fictional data.
 ```
 
-## Client Tool
+## Client Tools
 
 Create a client tool named `submit_intake_draft` with optional string parameters `full_name`, `email`, `phone`, and `intake_intent`. Mark it as blocking/wait-for-response. Its purpose is to prefill browser review fields only; it does not persist data.
+
+Create a second blocking client tool named `lookup_approved_faq` with one required string parameter named `query`. The browser sends the query and active conversation-session ID to the provider-neutral backend lookup. The tool returns JSON containing `matched`, `approved_answer`, `fallback_message`, and a source reference. Only a matched result may be presented as an agency answer; source IDs and versions are for auditability and must not be spoken.
 
 ## Privacy Checklist
 

@@ -8,6 +8,7 @@ import {
   confirmConversationIntake,
   endConversationSession,
 } from "./api";
+import { lookupConversationApprovedFaq } from "../approved-faqs/api";
 import { ConfiguredConversationAdapter } from "./configured-adapter";
 import type {
   ConfirmedConversationIntake,
@@ -23,9 +24,11 @@ import {
 } from "./lifecycle";
 import type { ConnectionFailureSource, ConversationPhase } from "./lifecycle";
 import { appendTranscript, validateConfirmation } from "./review";
+import type { ReceptionistSettings } from "../receptionist/contracts";
 
 type VoiceTestProperties = Readonly<{
   apiBaseUrl: string;
+  receptionistSettings: ReceptionistSettings;
 }>;
 
 type IntakeForm = {
@@ -42,7 +45,10 @@ const EMPTY_FORM: IntakeForm = {
   intakeIntent: "",
 };
 
-export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
+export function VoiceTest({
+  apiBaseUrl,
+  receptionistSettings,
+}: VoiceTestProperties) {
   const [transcript, setTranscript] = useState<ConversationTurn[]>([]);
   const [form, setForm] = useState<IntakeForm>(EMPTY_FORM);
   const [phase, setPhaseState] = useState<ConversationPhase>("idle");
@@ -77,6 +83,35 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
       intakeIntent: draft.intakeIntent ?? current.intakeIntent,
     }));
   }, []);
+
+  const handleApprovedFaqLookup = useCallback(
+    async (query: string) => {
+      const conversationSessionId = sessionIdRef.current;
+      if (conversationSessionId === undefined) {
+        return {
+          matched: false,
+          answer: null,
+          fallbackMessage: receptionistSettings.escalationMessage,
+          source: null,
+        };
+      }
+      try {
+        return await lookupConversationApprovedFaq(
+          apiBaseUrl,
+          conversationSessionId,
+          query,
+        );
+      } catch {
+        return {
+          matched: false,
+          answer: null,
+          fallbackMessage: receptionistSettings.escalationMessage,
+          source: null,
+        };
+      }
+    },
+    [apiBaseUrl, receptionistSettings.escalationMessage],
+  );
 
   const handleConnectionFailure = useCallback(
     (source: ConnectionFailureSource) => {
@@ -142,6 +177,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
 
   return (
     <ConfiguredConversationAdapter
+      onApprovedFaqLookup={handleApprovedFaqLookup}
       onDisconnect={handleDisconnect}
       onDraft={handleDraft}
       onError={handleError}
@@ -156,6 +192,7 @@ export function VoiceTest({ apiBaseUrl }: VoiceTestProperties) {
           intentionalEndRef={intentionalEndRef}
           phase={phase}
           phaseRef={phaseRef}
+          receptionistSettings={receptionistSettings}
           sessionIdRef={sessionIdRef}
           setErrorMessage={setErrorMessage}
           setForm={setForm}
@@ -176,6 +213,7 @@ type ExperienceProperties = Readonly<{
   intentionalEndRef: MutableRefObject<boolean>;
   phase: ConversationPhase;
   phaseRef: MutableRefObject<ConversationPhase>;
+  receptionistSettings: ReceptionistSettings;
   sessionIdRef: MutableRefObject<string | undefined>;
   setErrorMessage: Dispatch<SetStateAction<string | undefined>>;
   setForm: Dispatch<SetStateAction<IntakeForm>>;
@@ -192,6 +230,7 @@ function VoiceTestExperience({
   intentionalEndRef,
   phase,
   phaseRef,
+  receptionistSettings,
   sessionIdRef,
   setErrorMessage,
   setForm,
@@ -382,13 +421,23 @@ function VoiceTestExperience({
   return (
     <div className="voice-grid">
       <section className="voice-card" aria-labelledby="voice-controls-title">
-        <p className="eyebrow">Development demo · synthetic data only</p>
-        <h1 id="voice-controls-title">Voice AI insurance intake</h1>
+        <p className="eyebrow">{receptionistSettings.publicName}</p>
+        <h1 id="voice-controls-title">Talk to our AI receptionist</h1>
         <p className="summary">
-          Speak naturally with an AI intake assistant. It can collect contact
-          details and needs, but cannot quote, advise, bind coverage, verify
+          {receptionistSettings.greeting} It can collect contact details and
+          insurance interest, but cannot quote, advise, bind coverage, verify
           coverage, or make decisions.
         </p>
+        <div className="receptionist-context">
+          <p>
+            <strong>Supported interests:</strong>{" "}
+            {receptionistSettings.supportedInsuranceCategories.join(", ")}
+          </p>
+          <p>
+            <strong>Human follow-up:</strong>{" "}
+            {receptionistSettings.escalationMessage}
+          </p>
+        </div>
         <div className="disclosure" role="note">
           You are interacting with an AI, not a human. Your microphone audio and
           conversation are recorded during the session and may be shared with

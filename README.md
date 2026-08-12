@@ -1,6 +1,6 @@
 # Insurance Operations AI
 
-Next.js frontend, FastAPI API, separate Python worker, and shared Neon PostgreSQL persistence. The current development slice provides a synthetic, consent-gated, two-way ElevenLabs Voice AI intake with explicit review before customer creation.
+Next.js frontend, FastAPI API, separate Python worker, and shared Neon PostgreSQL persistence. The active product slice provides an agency-configurable, synthetic AI receptionist with consent-gated browser voice, explicit review, and audited intake confirmation.
 
 ## Setup
 
@@ -8,6 +8,7 @@ Requires Node.js 26 and Python 3.13.
 
 ```bash
 cp .env.example .env
+cp apps/web/.env.example apps/web/.env
 set -a
 source .env
 set +a
@@ -27,19 +28,25 @@ alembic upgrade head
 insurance-operations-seed-development
 ```
 
-The idempotent seed creates one development agency, deterministic synthetic actor, and active membership. It refuses test and production environments.
+The idempotent seed creates one development agency, deterministic synthetic actor, active membership, and synthetic receptionist profile. It refuses test and production environments.
 
 ## Voice AI Configuration
 
-Follow [the agent setup contract](docs/elevenlabs-agent-setup.md), then set the server-only `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, and privacy attestation. Enable both backend and public feature flags only for development:
+Follow [the agent setup contract](docs/elevenlabs-agent-setup.md), then set the server-only `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, and privacy attestation in the repository-root `.env`. Enable the backend feature flag only for development:
 
 Keep both feature flags `false` until the owner completes the provider privacy and billing checklist. The owner must explicitly select the LLM, STT, TTS, and voice in ElevenLabs; the application does not silently select substitutes.
 
 ```dotenv
 APP_ENVIRONMENT=development
 CONVERSATION_AI_ENABLED=true
-NEXT_PUBLIC_CONVERSATION_AI_ENABLED=true
 ELEVENLABS_PRIVACY_CONFIRMED=true
+```
+
+Enable the public feature flag separately in `apps/web/.env`:
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_CONVERSATION_AI_ENABLED=true
 ```
 
 Do not use real customer data. The browser receives only a short-lived WebRTC token, never the API key.
@@ -60,11 +67,11 @@ uvicorn insurance_operations.api:app --host "$API_HOST" --port "$API_PORT" --rel
 insurance-operations-worker
 ```
 
-Open `http://localhost:3000` and select **Test Voice AI**. Accept all three acknowledgements, speak with the assistant, finish within three minutes, edit the transcript/details, then confirm. Only confirmation persists the transcript and creates a customer.
+Open `http://localhost:3000`. Use **Configure receptionist** to review the seeded agency profile, then select **Talk to the receptionist**. Accept all three acknowledgements, speak with the assistant, finish within three minutes, edit the transcript/details, then confirm. Only confirmation persists the transcript and creates a customer.
 
 ## Verify
 
-Export the repository-root `.env` into the current shell before web verification; the workspace build does not automatically load that file. Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
+The web workspace loads public values from `apps/web/.env`; backend and worker commands load the repository-root `.env`. Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
 
 ```bash
 npm run verify:web
@@ -81,4 +88,4 @@ insurance-operations-worker --check
 
 Manual QA: verify disabled flags hide the route; deny microphone permission; force a disconnect while connecting and while active; confirm the ending state prevents retry until cleanup finishes; observe the 3:00 countdown; test mute/unmute; confirm the 11th daily authorization is rejected with clear guidance; retry one transient confirmation with the same idempotency key; confirm an expired session requires a new conversation; inspect that no raw audio or draft transcript exists in PostgreSQL or logs; and verify provider audio saving/retention settings in the dashboard.
 
-The approved Release 1 PDFs remain in `docs/release1/`. Read `AGENTS.md` and `docs/project-state.md` before changing architecture or scope.
+Follow the [AI receptionist product plan](docs/ai-receptionist-product-plan.md). Read `AGENTS.md` and `docs/project-state.md` before changing architecture or scope.

@@ -8,6 +8,7 @@ import {
 import type { ReactNode } from "react";
 
 import type {
+  ApprovedFaqToolLookup,
   ConversationClient,
   ConversationDraft,
   ConversationSpeaker,
@@ -18,6 +19,7 @@ type AdapterProperties = Readonly<{
   onDisconnect: () => void;
   onDraft: (draft: ConversationDraft) => void;
   onError: (message: string) => void;
+  onApprovedFaqLookup: ApprovedFaqToolLookup;
   onTranscript: (speaker: ConversationSpeaker, text: string) => void;
 }>;
 
@@ -26,6 +28,10 @@ type IntakeToolParameters = Readonly<{
   email?: unknown;
   phone?: unknown;
   intake_intent?: unknown;
+}>;
+
+type ApprovedFaqToolParameters = Readonly<{
+  query?: unknown;
 }>;
 
 export function ElevenLabsConversationAdapter(properties: AdapterProperties) {
@@ -41,11 +47,37 @@ function AdapterBridge({
   onDisconnect,
   onDraft,
   onError,
+  onApprovedFaqLookup,
   onTranscript,
 }: AdapterProperties) {
   const controls = useConversationControls();
   const conversation = useConversation({
     clientTools: {
+      lookup_approved_faq: async (parameters: ApprovedFaqToolParameters) => {
+        const query = optionalString(parameters.query);
+        if (query === undefined) {
+          return JSON.stringify({
+            matched: false,
+            approved_answer: null,
+            fallback_message: "Ask a human team member to follow up.",
+            source: null,
+          });
+        }
+        const result = await onApprovedFaqLookup(query);
+        return JSON.stringify({
+          matched: result.matched,
+          approved_answer: result.answer,
+          fallback_message: result.fallbackMessage,
+          source:
+            result.source === null
+              ? null
+              : {
+                  faq_id: result.source.faqId,
+                  question: result.source.question,
+                  row_version: result.source.rowVersion,
+                },
+        });
+      },
       submit_intake_draft: (parameters: IntakeToolParameters) => {
         onDraft({
           fullName: optionalString(parameters.full_name),

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "insurance-operations-ai"
 version = "0.1.0"
-description = "Release 1 backend and worker foundation"
+description = "AI receptionist platform for independent insurance agencies"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "alembic>=1.18.0,<2",

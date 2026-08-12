@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from insurance_operations.customers import CustomerInput, CustomerView
+from insurance_operations.database.models.lead import LeadUrgency
 
 
 class ConversationSessionCreateInput(BaseModel):
@@ -54,6 +55,7 @@ class ConversationIntakeConfirmationInput(BaseModel):
     conversation_session_id: UUID
     customer: CustomerInput
     intake_intent: str = Field(min_length=1, max_length=2_000)
+    urgency: LeadUrgency = LeadUrgency.NORMAL
     transcript: list[ConversationTurn] = Field(min_length=2, max_length=60)
 
     @model_validator(mode="after")
@@ -73,3 +75,4 @@ class ConversationIntakeResponse(BaseModel):
     conversation_session_id: UUID
     customer: CustomerView
     confirmed_at: datetime
+    lead_id: UUID | None = None

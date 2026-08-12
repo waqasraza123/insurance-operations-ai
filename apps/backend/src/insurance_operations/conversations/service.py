@@ -28,6 +28,7 @@ from insurance_operations.database.models.conversation import (
     ConversationSessionStatus,
 )
 from insurance_operations.database.models.identity import Agency
+from insurance_operations.database.models.lead import AgencyLead, LeadStatus
 from insurance_operations.database.models.operations import (
     AuditActorType,
     AuditEvent,
@@ -317,12 +318,25 @@ class ConversationService:
             )
             session.add(conversation_intake)
             session.flush()
+            lead = AgencyLead(
+                agency_id=actor.agency_id,
+                customer_id=customer.id,
+                conversation_intake_id=conversation_intake.id,
+                status=LeadStatus.NEW.value,
+                urgency=request.urgency.value,
+                summary=request.intake_intent,
+                created_by=actor.app_user_id,
+                updated_by=actor.app_user_id,
+            )
+            session.add(lead)
+            session.flush()
 
             response = ConversationIntakeResponse(
                 conversation_intake_id=conversation_intake.id,
                 conversation_session_id=conversation_session.id,
                 customer=customer_view(customer),
                 confirmed_at=now,
+                lead_id=lead.id,
             )
             session.add_all(
                 [
@@ -349,6 +363,23 @@ class ConversationService:
                         details={
                             "conversation_intake_id": str(conversation_intake.id),
                             "conversation_session_id": str(conversation_session.id),
+                        },
+                        correlation_id=correlation_id,
+                        event_version=1,
+                    ),
+                    AuditEvent(
+                        agency_id=actor.agency_id,
+                        actor_type=AuditActorType.STAFF.value,
+                        actor_user_id=actor.app_user_id,
+                        event_type="LEAD_CREATED",
+                        occurred_at=now,
+                        customer_id=customer.id,
+                        summary="Lead created from confirmed conversation intake",
+                        details={
+                            "lead_id": str(lead.id),
+                            "conversation_intake_id": str(conversation_intake.id),
+                            "status": lead.status,
+                            "urgency": lead.urgency,
                         },
                         correlation_id=correlation_id,
                         event_version=1,

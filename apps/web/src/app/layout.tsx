@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Insurance Operations AI",
-  description: "Release 1 engineering foundation",
+  title: "Insurance Operations AI Receptionist",
+  description:
+    "A guarded AI front desk for insurance agency intake and human follow-up.",
 };
 
 type RootLayoutProperties = Readonly<{

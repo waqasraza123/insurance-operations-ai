@@ -12,5 +12,8 @@
 - Use descriptive, consistent names and modular, reusable, strongly typed code.
 - Validate inputs and configuration, and return clear errors.
 - Do not guess requirements or introduce hardcoded hacks.
-- Keep changes testable and maintainable; run the relevant documented checks.
+- Keep changes testable and maintainable; document the relevant checks for the owner.
+- Do not run tests, builds, linters, type checks, migrations, seeds, readiness checks, smoke tests, live services, or other verification commands unless the owner explicitly asks for that specific execution.
+- Do not start background terminals, development servers, watchers, or long-running processes.
+- After each feature, clearly list the exact commands and manual checks the owner should run, and mark implementation as unverified until the owner reports the results.
 - Keep commit messages under 140 characters.

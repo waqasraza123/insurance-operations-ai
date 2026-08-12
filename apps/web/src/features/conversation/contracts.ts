@@ -12,6 +12,21 @@ export type ConversationDraft = Readonly<{
   intakeIntent?: string;
 }>;
 
+export type ApprovedFaqToolResult = Readonly<{
+  matched: boolean;
+  answer: string | null;
+  fallbackMessage: string;
+  source: Readonly<{
+    faqId: string;
+    question: string;
+    rowVersion: number;
+  }> | null;
+}>;
+
+export type ApprovedFaqToolLookup = (
+  query: string,
+) => Promise<ApprovedFaqToolResult>;
+
 export type ConversationConnectionStatus =
   "disconnected" | "connecting" | "connected";
 

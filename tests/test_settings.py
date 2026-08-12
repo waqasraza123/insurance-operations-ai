@@ -82,6 +82,7 @@ def test_enabled_conversation_ai_requires_privacy_attestation() -> None:
             development_actor_user_id="00000000-0000-4000-8000-000000000002",
             elevenlabs_api_key="test-secret",
             elevenlabs_agent_id="agent_test",
+            elevenlabs_privacy_confirmed=False,
         )
 
 
