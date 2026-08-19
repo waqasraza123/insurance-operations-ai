@@ -4,6 +4,7 @@ services:
     runtime: python
     plan: starter
     buildCommand: pip install .
+    preDeployCommand: alembic upgrade head && insurance-operations-seed-development
     startCommand: uvicorn insurance_operations.api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /ready
     autoDeployTrigger: checksPass
