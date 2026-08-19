@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Brand } from "@/components/brand";
 import { getReceptionistSettings } from "@/features/receptionist/api";
 import type { ReceptionistSettings } from "@/features/receptionist/contracts";
 import { getBackendStatus } from "@/lib/backend-health";
@@ -22,7 +23,7 @@ export default async function Home() {
   return (
     <main className="site-shell">
       <nav className="top-nav" aria-label="Primary navigation">
-        <span className="brand-link">Insurance Operations AI</span>
+        <Brand />
         {(environment.conversationAiEnabled ||
           environment.demoSandboxEnabled) && (
           <div className="nav-links">

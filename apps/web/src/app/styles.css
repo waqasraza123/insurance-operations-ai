@@ -80,11 +80,21 @@ main {
 }
 
 .brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
   color: var(--ink);
   font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   text-decoration: none;
+}
+
+.brand-mark {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .text-link {
@@ -844,6 +854,16 @@ code {
 }
 
 @media (max-width: 680px) {
+  .brand-link {
+    gap: 0.45rem;
+    font-size: 0.8rem;
+  }
+
+  .brand-mark {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
   .voice-grid,
   .settings-grid,
   .form-grid {

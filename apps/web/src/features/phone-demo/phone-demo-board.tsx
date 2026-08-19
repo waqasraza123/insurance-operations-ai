@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+
+import { Brand } from "@/components/brand";
 
 import { getPhoneDemoStatus } from "./api";
 import type { PhoneDemoState, PhoneDemoStatus } from "./contracts";
@@ -80,9 +81,7 @@ export function PhoneDemoBoard({
   return (
     <main className="phone-demo-shell">
       <nav className="top-nav" aria-label="Primary navigation">
-        <Link className="brand-link" href="/">
-          Insurance Operations AI
-        </Link>
+        <Brand />
         <span className="demo-mode-badge">Fictional demo</span>
       </nav>
 

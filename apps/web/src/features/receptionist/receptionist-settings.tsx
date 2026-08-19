@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { Brand } from "@/components/brand";
+
 import {
   getReceptionistSettings,
   ReceptionistSettingsApiError,
@@ -84,9 +86,7 @@ export function ReceptionistSettingsEditor({
   return (
     <main className="settings-shell">
       <nav className="top-nav" aria-label="Primary navigation">
-        <Link className="brand-link" href="/">
-          Insurance Operations AI
-        </Link>
+        <Brand />
         <div className="nav-links">
           <Link className="text-link" href="/approved-faqs">
             Approved FAQs
