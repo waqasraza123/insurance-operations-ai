@@ -5,7 +5,7 @@ import { parsePublicEnvironment } from "@/lib/environment";
 
 export default function ReceptionistSettingsPage() {
   const environment = parsePublicEnvironment(process.env);
-  if (!environment.conversationAiEnabled) {
+  if (!environment.conversationAiEnabled || environment.demoSandboxEnabled) {
     notFound();
   }
   return <ReceptionistSettingsEditor apiBaseUrl={environment.apiBaseUrl} />;

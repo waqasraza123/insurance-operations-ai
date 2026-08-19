@@ -95,3 +95,49 @@ def test_development_conversation_route_is_hidden_when_disabled() -> None:
     error = body["error"]
     assert isinstance(error, dict)
     assert error["code"] == "NOT_FOUND"
+
+
+def test_demo_sandbox_rejects_development_route_without_admin_token() -> None:
+    database_engine = Mock(spec=Engine)
+    settings = ApiSettings(
+        app_environment=RuntimeEnvironment.DEVELOPMENT,
+        api_host="127.0.0.1",
+        api_port=8000,
+        web_origin="http://localhost:3000",
+        database_url="postgresql://user:password@localhost/development",
+        database_ssl_mode=DatabaseSslMode.DISABLE,
+        conversation_ai_enabled=False,
+        development_actor_user_id="00000000-0000-4000-8000-000000000002",
+        demo_sandbox_enabled=True,
+        demo_admin_token="synthetic-demo-admin-token-32-chars",
+        demo_inbound_number_e164="+15550100100",
+        demo_transfer_destination_e164="+15550100200",
+    )
+
+    async def get_settings() -> tuple[int, object]:
+        transport = ASGITransport(app=create_app(settings, database_engine))
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/v1/development/receptionist-settings")
+        return response.status_code, response.json()
+
+    status_code, body = asyncio.run(get_settings())
+
+    assert status_code == 401
+    assert isinstance(body, dict)
+    error = body["error"]
+    assert isinstance(error, dict)
+    assert error["code"] == "DEMO_ADMIN_AUTH_REQUIRED"
+
+
+def test_public_demo_route_is_hidden_when_sandbox_is_disabled() -> None:
+    database_engine = Mock(spec=Engine)
+
+    status_code, body = asyncio.run(
+        get_response("/api/v1/demo/latest-phone-call", database_engine)
+    )
+
+    assert status_code == 404
+    assert isinstance(body, dict)
+    error = body["error"]
+    assert isinstance(error, dict)
+    assert error["code"] == "NOT_FOUND"

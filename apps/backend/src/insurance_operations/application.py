@@ -55,6 +55,7 @@ from insurance_operations.database.connection import (
 from insurance_operations.database.models.approved_faq import ApprovedFaqStatus
 from insurance_operations.database.models.lead import LeadStatus
 from insurance_operations.database.models.telephony import InboundCallStatus
+from insurance_operations.demo_security import require_demo_admin_token
 from insurance_operations.errors import ApiError, api_error_handler
 from insurance_operations.leads import (
     HandoffRequestCreateInput,
@@ -85,6 +86,10 @@ from insurance_operations.telephony import (
     InboundNumberResponse,
     InboundNumberStatusInput,
     TelephonyService,
+)
+from insurance_operations.telephony.demo import (
+    PhoneDemoService,
+    PhoneDemoStatusResponse,
 )
 from insurance_operations.telephony.routes import create_development_telephony_router
 
@@ -128,6 +133,10 @@ def create_app(
         idempotency_retention_hours=settings.idempotency_retention_hours,
     )
     telephony_service = TelephonyService(session_factory=session_factory)
+    phone_demo_service = PhoneDemoService(
+        session_factory=session_factory,
+        result_ttl_minutes=settings.demo_result_ttl_minutes,
+    )
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -149,7 +158,12 @@ def create_app(
         allow_origins=[settings.web_origin],
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT"],
-        allow_headers=["Content-Type", "Idempotency-Key", "X-Correlation-ID"],
+        allow_headers=[
+            "Content-Type",
+            "Idempotency-Key",
+            "X-Correlation-ID",
+            "X-Demo-Admin-Token",
+        ],
         expose_headers=["Idempotent-Replayed", "X-Correlation-ID"],
     )
 
@@ -215,7 +229,16 @@ def create_app(
             )
         return conversation_service
 
-    def development_actor() -> ActorContext:
+    def development_actor(
+        demo_admin_token: Annotated[
+            str | None,
+            Header(alias="X-Demo-Admin-Token"),
+        ] = None,
+    ) -> ActorContext:
+        require_demo_admin_token(settings, demo_admin_token)
+        return resolve_actor()
+
+    def resolve_actor() -> ActorContext:
         if (
             settings.app_environment is not RuntimeEnvironment.DEVELOPMENT
             or settings.development_actor_user_id is None
@@ -237,6 +260,15 @@ def create_app(
                 code="DEVELOPMENT_CONTEXT_NOT_FOUND",
                 message="The development context is unavailable",
             ) from error
+
+    def demo_actor() -> ActorContext:
+        if not settings.demo_sandbox_enabled:
+            raise ApiError(
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="NOT_FOUND",
+                message="The requested resource was not found",
+            )
+        return resolve_actor()
 
     def conversation_actor(
         service: Annotated[
@@ -272,6 +304,17 @@ def create_app(
             environment=settings.app_environment,
             database="ready",
         )
+
+    @application.get(
+        "/api/v1/demo/latest-phone-call",
+        response_model=PhoneDemoStatusResponse,
+    )
+    def get_latest_phone_demo_status(
+        response: Response,
+        actor: Annotated[ActorContext, Depends(demo_actor)],
+    ) -> PhoneDemoStatusResponse:
+        response.headers["Cache-Control"] = "no-store"
+        return phone_demo_service.latest_status(agency_id=actor.agency_id)
 
     @application.post(
         "/api/v1/development/conversation-sessions",

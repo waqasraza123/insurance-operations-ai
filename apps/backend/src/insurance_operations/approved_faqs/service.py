@@ -20,6 +20,7 @@ from insurance_operations.database.models.approved_faq import (
     ApprovedFaqStatus,
 )
 from insurance_operations.database.models.conversation import (
+    ConversationChannel,
     ConversationSession,
     ConversationSessionStatus,
 )
@@ -175,7 +176,7 @@ class ApprovedFaqService:
         query: str,
     ) -> ApprovedFaqLookupResponse:
         with self._session_factory() as session:
-            return self._lookup(session, actor, query)
+            return self._lookup(session, actor.agency_id, query)
 
     def conversation_lookup(
         self,
@@ -204,7 +205,7 @@ class ApprovedFaqService:
                     code="CONVERSATION_SESSION_NOT_ACTIVE",
                     message="The conversation session is not active",
                 )
-            result = self._lookup(session, actor, query)
+            result = self._lookup(session, actor.agency_id, query)
             if result.source is not None:
                 session.add(
                     AuditEvent(
@@ -225,15 +226,72 @@ class ApprovedFaqService:
                 )
             return result
 
+    def phone_conversation_lookup(
+        self,
+        *,
+        inbound_call_id: UUID,
+        conversation_id: str,
+        query: str,
+        correlation_id: UUID,
+    ) -> ApprovedFaqLookupResponse:
+        now = datetime.now(UTC)
+        with self._session_factory() as session, session.begin():
+            conversation_session = session.scalar(
+                select(ConversationSession).where(
+                    ConversationSession.inbound_call_id == inbound_call_id,
+                    ConversationSession.channel == ConversationChannel.PHONE.value,
+                )
+            )
+            if (
+                conversation_session is None
+                or conversation_session.status
+                != ConversationSessionStatus.AUTHORIZED.value
+                or conversation_session.authorization_expires_at <= now
+                or conversation_session.provider_metadata.get(
+                    "external_session_reference"
+                )
+                != conversation_id
+            ):
+                raise ApiError(
+                    status_code=409,
+                    code="CONVERSATION_SESSION_NOT_ACTIVE",
+                    message="The conversation session is not active",
+                )
+            result = self._lookup(
+                session,
+                conversation_session.agency_id,
+                query,
+            )
+            if result.source is not None:
+                session.add(
+                    AuditEvent(
+                        agency_id=conversation_session.agency_id,
+                        actor_type=AuditActorType.SYSTEM.value,
+                        actor_user_id=None,
+                        event_type="AGENCY_APPROVED_FAQ_ANSWER_USED",
+                        occurred_at=now,
+                        summary="Agency-approved FAQ answer supplied",
+                        details={
+                            "conversation_session_id": str(conversation_session.id),
+                            "faq_id": str(result.source.faq_id),
+                            "faq_row_version": result.source.row_version,
+                            "channel": ConversationChannel.PHONE.value,
+                        },
+                        correlation_id=correlation_id,
+                        event_version=1,
+                    )
+                )
+            return result
+
     def _lookup(
         self,
         session: Session,
-        actor: ActorContext,
+        agency_id: UUID,
         query: str,
     ) -> ApprovedFaqLookupResponse:
         settings = session.scalar(
             select(AgencyReceptionistSettings).where(
-                AgencyReceptionistSettings.agency_id == actor.agency_id
+                AgencyReceptionistSettings.agency_id == agency_id
             )
         )
         if settings is None:
@@ -244,7 +302,7 @@ class ApprovedFaqService:
             )
         faqs = session.scalars(
             select(AgencyApprovedFaq).where(
-                AgencyApprovedFaq.agency_id == actor.agency_id,
+                AgencyApprovedFaq.agency_id == agency_id,
                 AgencyApprovedFaq.status == ApprovedFaqStatus.ACTIVE.value,
             )
         ).all()

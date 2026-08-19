@@ -33,6 +33,11 @@ class ConversationSessionStatus(StrEnum):
     EXPIRED = "EXPIRED"
 
 
+class ConversationChannel(StrEnum):
+    BROWSER = "BROWSER"
+    PHONE = "PHONE"
+
+
 class ConversationSession(UuidPrimaryKeyMixin, TimestampedMixin, VersionedMixin, Base):
     __tablename__ = "conversation_sessions"
     __table_args__ = (
@@ -50,9 +55,22 @@ class ConversationSession(UuidPrimaryKeyMixin, TimestampedMixin, VersionedMixin,
             name="provider_metadata_object",
         ),
         CheckConstraint(
+            "channel IN ('BROWSER', 'PHONE')",
+            name="channel_valid",
+        ),
+        CheckConstraint(
+            "(channel = 'BROWSER' AND inbound_call_id IS NULL) OR "
+            "(channel = 'PHONE' AND inbound_call_id IS NOT NULL)",
+            name="channel_call_consistent",
+        ),
+        CheckConstraint(
             "(status = 'CONFIRMED' AND confirmed_at IS NOT NULL) OR "
             "(status <> 'CONFIRMED' AND confirmed_at IS NULL)",
             name="confirmed_at_consistent",
+        ),
+        UniqueConstraint(
+            "inbound_call_id",
+            name="uq_conversation_sessions_inbound_call",
         ),
         CheckConstraint("row_version > 0", name="row_version_positive"),
         Index(
@@ -80,6 +98,20 @@ class ConversationSession(UuidPrimaryKeyMixin, TimestampedMixin, VersionedMixin,
     initiated_by: Mapped[UUID] = mapped_column(
         ForeignKey("app_users.id", ondelete="RESTRICT"),
         nullable=False,
+    )
+    channel: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default=ConversationChannel.BROWSER.value,
+        server_default=ConversationChannel.BROWSER.value,
+    )
+    inbound_call_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "inbound_calls.id",
+            name="fk_conversation_sessions_inbound_call",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
     )
     status: Mapped[str] = mapped_column(
         Text,
@@ -186,6 +218,68 @@ class ConversationIntake(UuidPrimaryKeyMixin, Base):
         JSONB,
         nullable=False,
     )
+    confirmed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class ConversationIntakeConfirmationReceipt(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "conversation_intake_confirmation_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "length(btrim(full_name)) BETWEEN 1 AND 200",
+            name="name_valid",
+        ),
+        CheckConstraint(
+            "email IS NOT NULL OR phone IS NOT NULL",
+            name="contact_required",
+        ),
+        CheckConstraint(
+            "length(btrim(intake_intent)) BETWEEN 1 AND 2000",
+            name="intent_valid",
+        ),
+        CheckConstraint(
+            "urgency IN ('LOW', 'NORMAL', 'HIGH')",
+            name="urgency_valid",
+        ),
+        CheckConstraint(
+            "length(request_fingerprint) = 64",
+            name="fingerprint_valid",
+        ),
+        UniqueConstraint(
+            "conversation_session_id",
+            name="uq_confirmation_receipts_session",
+        ),
+        UniqueConstraint(
+            "inbound_call_id",
+            name="uq_confirmation_receipts_call",
+        ),
+    )
+
+    agency_id: Mapped[UUID] = mapped_column(
+        ForeignKey("agencies.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    conversation_session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversation_sessions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    inbound_call_id: Mapped[UUID] = mapped_column(
+        ForeignKey("inbound_calls.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    full_name: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    intake_intent: Mapped[str] = mapped_column(Text, nullable=False)
+    urgency: Mapped[str] = mapped_column(Text, nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
     confirmed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

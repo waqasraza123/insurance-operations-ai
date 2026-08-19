@@ -156,6 +156,7 @@ class InboundCallReceiveInput(BaseModel):
 class InboundCallEventType(StrEnum):
     ANSWERED = "ANSWERED"
     TRANSFER_REQUESTED = "TRANSFER_REQUESTED"
+    CALLBACK_REQUESTED = "CALLBACK_REQUESTED"
     TRANSFER_SUCCEEDED = "TRANSFER_SUCCEEDED"
     TRANSFER_FAILED = "TRANSFER_FAILED"
     CALL_ENDED = "CALL_ENDED"
@@ -180,10 +181,16 @@ class InboundCallEventInput(BaseModel):
     @model_validator(mode="after")
     def validate_failure_code(self) -> Self:
         if (
-            self.event_type is not InboundCallEventType.PROVIDER_FAILED
+            self.event_type
+            not in {
+                InboundCallEventType.PROVIDER_FAILED,
+                InboundCallEventType.TRANSFER_FAILED,
+            }
             and self.failure_code is not None
         ):
-            raise ValueError("failure_code is only valid for PROVIDER_FAILED")
+            raise ValueError(
+                "failure_code is valid only for provider or transfer failures"
+            )
         return self
 
 

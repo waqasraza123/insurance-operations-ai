@@ -1,9 +1,9 @@
 # Project State
 ## Product
-Insurance Operations AI is becoming an AI front desk SaaS for small independent U.S. insurance agencies. The target product answers agency-approved FAQs, collects qualified leads, and routes requests for human follow-up through browser voice and, after the browser workflow is complete, inbound telephone calls. The current implementation remains a development-only, synthetic-data browser voice foundation.
+Insurance Operations AI is becoming an AI front desk SaaS for small independent U.S. insurance agencies. The target product answers agency-approved FAQs, collects qualified leads, and routes requests for human follow-up through browser voice and inbound telephone calls. The current implementation includes development-only, synthetic-data browser and telephone foundations. The telephone slice is automated-test verified; live provider configuration and a synthetic call remain pending.
 
 ## Current Architecture
-One repository contains a Next.js TypeScript frontend, FastAPI API, and separate Python worker. FastAPI and worker share SQLAlchemy 2 and psycopg 3 connections to Neon PostgreSQL; runtime uses bounded pooling and Alembic uses a direct connection. The verified database contains agencies, application users, memberships, customers, audit events, idempotency records, generic conversation sessions, immutable confirmed conversation intakes, receptionist settings, approved FAQs, leads, and human-handoff requests. The repository also defines an unverified migration and backend contracts for agency call policies, inbound numbers, inbound calls, and immutable call events. Voice provider details are isolated behind provider-neutral contracts and adapters. Development APIs resolve one deterministic active actor and agency without a production authentication system.
+One repository contains a Next.js TypeScript frontend, FastAPI API, and separate Python worker. FastAPI and worker share SQLAlchemy 2 and psycopg 3 connections to Neon PostgreSQL; runtime uses bounded pooling and Alembic uses a direct connection. The verified database contains agencies, application users, memberships, customers, audit events, idempotency records, generic conversation sessions, immutable confirmed conversation intakes, receptionist settings, approved FAQs, leads, human-handoff requests, call policies, inbound numbers, calls, immutable call events, browser/phone session channels, call linkage, and immutable verbal-confirmation receipts. Provider-specific behavior is isolated in Twilio and ElevenLabs adapters while application call state remains provider-neutral. Development APIs resolve one deterministic active actor and agency without a production authentication system; hosted demo administration adds a development-only bearer token while its public status projection is content-minimizing.
 
 ## Non-Negotiable Rules
 - Neon PostgreSQL is the only database; no Supabase runtime or authentication code.
@@ -43,26 +43,34 @@ Backend/API completion is the active execution strategy: finish approved knowled
 - Keep browser and telephone channels thin: both must reuse the same backend FAQ, intake, lead, handoff, quota, and audit services through provider-neutral ports.
 - Freeze new frontend work until backend browser and telephone capabilities are complete and owner-verified; build the final UI against stable API contracts.
 - Answer only from active agency-approved FAQs and retain a source reference for each supported answer.
+- Use a separate private ElevenLabs phone agent. Twilio retains carrier and transfer authority; ElevenLabs register-call supplies the conversational media connection.
+- Do not materialize phone-originated customers, confirmed intakes, leads, transcripts, or handoffs until an explicit verbal readback receipt exists and a signed post-call transcript finalizes the call.
 
-## Implementation Pending Owner Verification
+## Verified Telephone and Demo Implementation
 - Migration `20260808_0007` adds agency call policies, inbound-number routing, inbound calls, immutable call events, and one callback handoff per inbound call.
-- Development APIs simulate provider-neutral call reception, event transitions, open-hours transfer decisions, after-hours/failed-transfer callback fallback, lead linking, concurrency limits, and daily limits.
-- Telephony and notification ports define vendor boundaries; no concrete telephone adapter, signed webhook ingress, or external notification delivery is connected.
+- Migration `20260819_0008` adds browser/phone conversation channels, one-to-one inbound-call linkage, and immutable structured verbal-confirmation receipts.
+- Signed Twilio ingress now normalizes inbound calls, returns ElevenLabs register-call TwiML, executes carrier-side active-call transfers, and normalizes signed transfer results.
+- Authenticated ElevenLabs tools gate consent, agency-approved FAQ lookup, structured intake readback confirmation, and transfer/callback requests. HMAC-verified post-call transcripts materialize confirmed customer, intake, lead, and handoff records exactly once; unconfirmed transcript content is discarded.
+- Telephone provider configuration is development-only, limited to 180 seconds, synthetic data, a dedicated phone agent, and explicit privacy confirmation.
+- A Harborline sandbox seed, protected hosted-demo administration, sanitized public call-status projection, `/phone-demo` showcase, Render Blueprint, Vercel configuration, and client-demo runbook are implemented.
+- Automated verification covers provider signatures, tools, post-call materialization, idempotency, transfers, callback fallback, schema invariants, sandbox security, the public projection, and the production web build. Live provider dashboards and a real carrier call are not application-verifiable and remain pending.
 
 ## Deferred / Not Yet Implemented
-Concrete telephony adapter, signed provider webhook ingress, DTMF, enforced call duration, detailed usage/cost metering, durable notification outbox/delivery, production authentication, real customer use, billing, integrations, deployment controls, final operations UI, and production hardening remain deferred. Raw-audio storage remains out of scope by default.
+DTMF, detailed usage/cost metering, durable notification outbox/delivery, production authentication, real customer use, billing, integrations, deployment controls, final operations UI, and production hardening remain deferred. Raw-audio storage remains out of scope by default.
 
 ## Risks / Watchouts
 - The backend approved-FAQ, lead, and handoff services are verified, but the final lead inbox UI and complete browser acceptance workflow remain required for the Milestone 1 acceptance gate.
-- The disposable test database rebuild and full 44-test Python suite pass. A follow-up migration shortens one receptionist check-constraint identifier to avoid PostgreSQL's identifier-length truncation; development is at the new head and Alembic reports no model drift.
+- The focused phone/migration suite passes 29 tests. The complete Python run reached 69 passes and one transient Neon read timeout; the timed-out schema-inspection test passed immediately on isolated retry. The disposable database was restored to `20260819_0008 (head)`, and Alembic reports no model drift.
 - The owner reports clean migration, static-analysis, focused database/API, and Alembic drift results for the approved-FAQ and migration `20260808_0006` lead/handoff slices.
-- The inbound-call migration and backend orchestration are implemented but unverified; do not claim real telephone support until the owner reports clean checks and a concrete signed adapter is implemented.
+- Do not present the sandbox as live telephone support until the provider-dashboard and temporary-number checklist completes. Automated checks cannot verify Twilio routing, ElevenLabs dashboard privacy/audio settings, carrier transfer behavior, or end-to-end call quality.
+- ElevenLabs register-call mode does not provide native transfers. The implementation deliberately commands the active Twilio call and consumes Twilio's signed Dial result; this behavior requires a live synthetic-call check.
 - The web workspace uses pinned Next.js 16.2.12 and ElevenLabs React 1.12.0 dependencies; both are installed and verified under Node.js 26.
 - Provider dashboard privacy settings and the agent prompt/tool must be verified manually; the application cannot prove provider-side retention from its API response.
 - The synthetic-demo disclosure is implemented; provider region, LLM, STT, TTS, voice, privacy controls, and billing controls still require owner selection and dashboard verification before enabling the feature flags.
 - Browser transcript callbacks can contain evolving recognition text; the UI de-duplicates adjacent updates and explicit review remains mandatory.
 - The development actor is deliberately not production authentication and the routes are hidden unless development-only flags and seed data agree.
 - Never run database downgrade/rebuild commands unless `TEST_DATABASE_URL` is confirmed disposable and isolated.
+- Alembic drift detection currently warns about an unresolvable foreign-key cycle among `agency_leads`, `conversation_intakes`, `conversation_sessions`, and `inbound_calls`. It reports no drift today, but a future SQLAlchemy/Alembic release may make this warning fatal.
 
 ## Standard Verification
 - `npm install --package-lock-only --ignore-scripts --workspace @insurance-operations/web`

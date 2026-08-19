@@ -42,6 +42,13 @@ CONVERSATION_AI_ENABLED=true
 ELEVENLABS_PRIVACY_CONFIRMED=true
 ```
 
+Inbound phone development uses a separate ElevenLabs phone agent behind Twilio.
+Keep it disabled until the dedicated
+[phone-agent](docs/elevenlabs-phone-agent-setup.md) and
+[telephony-provider](docs/telephony-provider-setup.md) checklists are complete.
+For the hosted fictional-data sales sandbox, follow the
+[client phone demo runbook](docs/client-phone-demo-runbook.md).
+
 Enable the public feature flag separately in `apps/web/.env`:
 
 ```dotenv

@@ -24,6 +24,16 @@ class TransferInstruction:
     ring_timeout_seconds: int
 
 
+@dataclass(frozen=True)
+class VerifiedTransferResult:
+    adapter_name: str
+    source_call_reference: str
+    event_key: str
+    succeeded: bool
+    occurred_at: datetime
+    failure_code: str | None = None
+
+
 class TelephonyAdapter(Protocol):
     def verify_inbound_webhook(
         self,
@@ -38,5 +48,12 @@ class TelephonyAdapter(Protocol):
         source_call_reference: str,
         instruction: TransferInstruction,
     ) -> None: ...
+
+    def verify_transfer_callback(
+        self,
+        *,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> VerifiedTransferResult: ...
 
     def close(self) -> None: ...

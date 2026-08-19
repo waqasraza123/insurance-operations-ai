@@ -25,6 +25,7 @@ from insurance_operations.database.models.telephony import (
 from insurance_operations.telephony.contracts import (
     TransferInstruction,
     VerifiedInboundCall,
+    VerifiedTransferResult,
 )
 from insurance_operations.telephony.ingress import TelephonyIngressService
 from insurance_operations.telephony.service import TelephonyService
@@ -57,6 +58,15 @@ class FakeVerifiedAdapter:
         instruction: TransferInstruction,
     ) -> None:
         del source_call_reference, instruction
+
+    def verify_transfer_callback(
+        self,
+        *,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> VerifiedTransferResult:
+        del headers, body
+        raise AssertionError("transfer callback was not expected")
 
     def close(self) -> None:
         return None

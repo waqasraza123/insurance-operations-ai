@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Header, Query, Request, status
 from sqlalchemy.orm import Session, sessionmaker
 
 from insurance_operations.actors import (
@@ -10,6 +10,7 @@ from insurance_operations.actors import (
     resolve_development_actor,
 )
 from insurance_operations.database.models.telephony import InboundCallStatus
+from insurance_operations.demo_security import require_demo_admin_token
 from insurance_operations.errors import ApiError
 from insurance_operations.settings import ApiSettings, RuntimeEnvironment
 from insurance_operations.telephony.schemas import (
@@ -36,7 +37,13 @@ def create_development_telephony_router(
     router = APIRouter(prefix="/api/v1/development")
     service = TelephonyService(session_factory=session_factory)
 
-    def development_actor() -> ActorContext:
+    def development_actor(
+        demo_admin_token: Annotated[
+            str | None,
+            Header(alias="X-Demo-Admin-Token"),
+        ] = None,
+    ) -> ActorContext:
+        require_demo_admin_token(settings, demo_admin_token)
         if (
             settings.app_environment is not RuntimeEnvironment.DEVELOPMENT
             or settings.development_actor_user_id is None

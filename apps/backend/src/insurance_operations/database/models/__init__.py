@@ -6,7 +6,9 @@ from insurance_operations.database.models.approved_faq import (
 )
 from insurance_operations.database.models.base import Base
 from insurance_operations.database.models.conversation import (
+    ConversationChannel,
     ConversationIntake,
+    ConversationIntakeConfirmationReceipt,
     ConversationSession,
 )
 from insurance_operations.database.models.customer import Customer
@@ -63,6 +65,10 @@ TABLE_OWNERSHIP = {
         module="conversations",
         agency_column="agency_id",
     ),
+    "conversation_intake_confirmation_receipts": TableOwnership(
+        module="conversations",
+        agency_column="agency_id",
+    ),
     "agency_receptionist_settings": TableOwnership(
         module="receptionist",
         agency_column="agency_id",
@@ -112,7 +118,9 @@ __all__ = [
     "ApprovedFaqStatus",
     "AuditEvent",
     "Base",
+    "ConversationChannel",
     "ConversationIntake",
+    "ConversationIntakeConfirmationReceipt",
     "ConversationSession",
     "Customer",
     "HandoffContactMethod",

@@ -2,16 +2,22 @@ import argparse
 from dataclasses import dataclass
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from insurance_operations.database.connection import create_database_engine
 from insurance_operations.database.models import (
     Agency,
     AgencyApprovedFaq,
+    AgencyCallPolicy,
+    AgencyInboundNumber,
     AgencyMembership,
     AgencyReceptionistSettings,
     AppUser,
+    InboundNumberStatus,
 )
 from insurance_operations.database.models.identity import AgencyEnvironment
 from insurance_operations.settings import DatabaseSettings, RuntimeEnvironment
@@ -28,6 +34,8 @@ DEVELOPMENT_APPROVED_FAQ_IDS = (
     UUID("00000000-0000-4000-8000-000000000007"),
     UUID("00000000-0000-4000-8000-000000000008"),
 )
+DEVELOPMENT_CALL_POLICY_ID = UUID("00000000-0000-4000-8000-000000000009")
+DEVELOPMENT_INBOUND_NUMBER_ID = UUID("00000000-0000-4000-8000-000000000010")
 DEVELOPMENT_ACTOR_DISPLAY_NAME = "Synthetic Voice AI Tester"
 DEVELOPMENT_RECEPTIONIST_PUBLIC_NAME = "Harborline Insurance"
 
@@ -39,6 +47,8 @@ class DevelopmentSeedResult:
     membership_created: bool
     receptionist_settings_created: bool
     approved_faqs_created: int
+    call_policy_configured: bool = False
+    inbound_number_configured: bool = False
 
 
 def seed_development_foundation(settings: DatabaseSettings) -> DevelopmentSeedResult:
@@ -158,15 +168,118 @@ def seed_development_foundation(settings: DatabaseSettings) -> DevelopmentSeedRe
                 connection.scalar(statement) is not None
                 for statement in approved_faq_statements
             )
-            return DevelopmentSeedResult(
-                agency_created=agency_created,
-                actor_created=actor_created,
-                membership_created=membership_created,
-                receptionist_settings_created=receptionist_settings_created,
-                approved_faqs_created=approved_faqs_created,
-            )
+        call_policy_configured, inbound_number_configured = configure_demo_telephony(
+            database_engine, settings
+        )
+        return DevelopmentSeedResult(
+            agency_created=agency_created,
+            actor_created=actor_created,
+            membership_created=membership_created,
+            receptionist_settings_created=receptionist_settings_created,
+            approved_faqs_created=approved_faqs_created,
+            call_policy_configured=call_policy_configured,
+            inbound_number_configured=inbound_number_configured,
+        )
     finally:
         database_engine.dispose()
+
+
+def configure_demo_telephony(
+    database_engine: Engine,
+    settings: DatabaseSettings,
+) -> tuple[bool, bool]:
+    inbound_number = settings.demo_inbound_number_e164
+    transfer_destination = settings.demo_transfer_destination_e164
+    if inbound_number is None and transfer_destination is None:
+        return False, False
+    if inbound_number is None or transfer_destination is None:
+        raise ValueError("demo telephony seed requires both demo phone-number settings")
+
+    availability_windows = [
+        {
+            "weekday": weekday,
+            "start_local": "00:00",
+            "end_local": "23:59",
+        }
+        for weekday in range(7)
+    ]
+    policy_values: dict[str, object] = {
+        "inbound_enabled": True,
+        "timezone": "UTC",
+        "availability_windows": availability_windows,
+        "transfer_enabled": True,
+        "transfer_destination_e164": transfer_destination,
+        "transfer_ring_timeout_seconds": 20,
+        "max_concurrent_calls": 2,
+        "daily_call_limit": 10,
+        "callback_fallback_enabled": True,
+        "after_hours_message": (
+            "The synthetic demo team is unavailable and will follow up."
+        ),
+        "unavailable_message": (
+            "The synthetic demo team could not answer and will follow up."
+        ),
+        "updated_by": DEVELOPMENT_ACTOR_USER_ID,
+    }
+    with Session(database_engine) as session, session.begin():
+        policy = session.get(AgencyCallPolicy, DEVELOPMENT_CALL_POLICY_ID)
+        if policy is None:
+            policy = session.scalar(
+                select(AgencyCallPolicy).where(
+                    AgencyCallPolicy.agency_id == DEVELOPMENT_AGENCY_ID
+                )
+            )
+        policy_changed = policy is None or any(
+            getattr(policy, key) != value for key, value in policy_values.items()
+        )
+        if policy is None:
+            session.add(
+                AgencyCallPolicy(
+                    id=DEVELOPMENT_CALL_POLICY_ID,
+                    agency_id=DEVELOPMENT_AGENCY_ID,
+                    created_by=DEVELOPMENT_ACTOR_USER_ID,
+                    **policy_values,
+                )
+            )
+        elif policy_changed:
+            for key, value in policy_values.items():
+                setattr(policy, key, value)
+
+        mapped_number = session.scalar(
+            select(AgencyInboundNumber).where(
+                AgencyInboundNumber.phone_number_e164 == inbound_number
+            )
+        )
+        if (
+            mapped_number is not None
+            and mapped_number.agency_id != DEVELOPMENT_AGENCY_ID
+        ):
+            raise ValueError("the demo inbound number belongs to another agency")
+        number = session.get(AgencyInboundNumber, DEVELOPMENT_INBOUND_NUMBER_ID)
+        if number is None:
+            number = mapped_number
+        number_values: dict[str, object] = {
+            "phone_number_e164": inbound_number,
+            "label": "Harborline phone-agent demo",
+            "status": InboundNumberStatus.ACTIVE.value,
+            "updated_by": DEVELOPMENT_ACTOR_USER_ID,
+        }
+        number_changed = number is None or any(
+            getattr(number, key) != value for key, value in number_values.items()
+        )
+        if number is None:
+            session.add(
+                AgencyInboundNumber(
+                    id=DEVELOPMENT_INBOUND_NUMBER_ID,
+                    agency_id=DEVELOPMENT_AGENCY_ID,
+                    created_by=DEVELOPMENT_ACTOR_USER_ID,
+                    **number_values,
+                )
+            )
+        elif number_changed:
+            for key, value in number_values.items():
+                setattr(number, key, value)
+        return policy_changed, number_changed
 
 
 def main() -> None:

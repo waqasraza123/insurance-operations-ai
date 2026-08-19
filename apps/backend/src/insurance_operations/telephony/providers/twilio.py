@@ -13,6 +13,7 @@ from insurance_operations.telephony.contracts import (
     TelephonyAdapterError,
     TransferInstruction,
     VerifiedInboundCall,
+    VerifiedTransferResult,
 )
 from insurance_operations.telephony.schemas import validate_e164
 
@@ -44,11 +45,13 @@ class TwilioTelephonyAdapter:
         account_sid: str,
         auth_token: str,
         inbound_webhook_url: str,
+        transfer_callback_url: str | None = None,
         call_updater: TwilioCallUpdater | None = None,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._account_sid = account_sid
         self._inbound_webhook_url = inbound_webhook_url
+        self._transfer_callback_url = transfer_callback_url
         self._request_validator = RequestValidator(auth_token)
         self._call_updater = call_updater or TwilioSdkCallUpdater(
             account_sid=account_sid,
@@ -150,15 +153,67 @@ class TwilioTelephonyAdapter:
             ) from error
 
         response = VoiceResponse()
-        response.dial(
-            destination,
-            timeout=instruction.ring_timeout_seconds,
-            answer_on_bridge=True,
-        )
+        dial_options: dict[str, object] = {
+            "timeout": instruction.ring_timeout_seconds,
+            "answer_on_bridge": True,
+        }
+        if self._transfer_callback_url is not None:
+            dial_options.update(
+                action=self._transfer_callback_url,
+                method="POST",
+            )
+        response.dial(destination, **dial_options)
 
         self._call_updater.update_call(
             call_sid=source_call_reference,
             twiml=str(response),
+        )
+
+    def verify_transfer_callback(
+        self,
+        *,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> VerifiedTransferResult:
+        if self._transfer_callback_url is None:
+            raise TelephonyAdapterError("telephony transfer callback is unavailable")
+
+        parameters = verified_form_parameters(
+            request_validator=self._request_validator,
+            expected_url=self._transfer_callback_url,
+            headers=headers,
+            body=body,
+        )
+        if required_parameter(parameters, "AccountSid") != self._account_sid:
+            raise TelephonyAdapterError("telephony webhook verification failed")
+
+        call_sid = required_parameter(parameters, "CallSid")
+        if TWILIO_CALL_SID_PATTERN.fullmatch(call_sid) is None:
+            raise TelephonyAdapterError("telephony webhook verification failed")
+
+        dial_call_sid = required_parameter(parameters, "DialCallSid")
+        if TWILIO_CALL_SID_PATTERN.fullmatch(dial_call_sid) is None:
+            raise TelephonyAdapterError("telephony webhook verification failed")
+
+        dial_status = required_parameter(parameters, "DialCallStatus").casefold()
+        if dial_status not in {"completed", "busy", "no-answer", "failed", "canceled"}:
+            raise TelephonyAdapterError("telephony webhook verification failed")
+
+        occurred_at = self._clock()
+        if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
+            raise RuntimeError("telephony adapter clock must return an aware datetime")
+
+        return VerifiedTransferResult(
+            adapter_name=self.adapter_name,
+            source_call_reference=call_sid,
+            event_key=f"transfer-result:{dial_call_sid}:{dial_status}",
+            succeeded=dial_status == "completed",
+            occurred_at=occurred_at,
+            failure_code=(
+                None
+                if dial_status == "completed"
+                else f"TRANSFER_{dial_status.replace('-', '_').upper()}"
+            ),
         )
 
     def close(self) -> None:
@@ -173,6 +228,34 @@ def required_parameter(
     if value is None or not value.strip():
         raise TelephonyAdapterError("telephony webhook verification failed")
     return value.strip()
+
+
+def verified_form_parameters(
+    *,
+    request_validator: RequestValidator,
+    expected_url: str,
+    headers: Mapping[str, str],
+    body: bytes,
+) -> dict[str, str]:
+    signature = header_value(headers, "X-Twilio-Signature")
+    content_type = header_value(headers, "Content-Type")
+    if (
+        signature is None
+        or content_type is None
+        or not content_type.lower().startswith("application/x-www-form-urlencoded")
+    ):
+        raise TelephonyAdapterError("telephony webhook verification failed")
+    try:
+        raw_body = body.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise TelephonyAdapterError("telephony webhook verification failed") from error
+    pairs = parse_qsl(raw_body, keep_blank_values=True, strict_parsing=False)
+    parameters = dict(pairs)
+    if not parameters or len(parameters) != len(pairs):
+        raise TelephonyAdapterError("telephony webhook verification failed")
+    if not request_validator.validate(expected_url, parameters, signature):
+        raise TelephonyAdapterError("telephony webhook verification failed")
+    return parameters
 
 
 def provider_e164(

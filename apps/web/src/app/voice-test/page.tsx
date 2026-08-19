@@ -7,7 +7,7 @@ import { parsePublicEnvironment } from "@/lib/environment";
 
 export default async function VoiceTestPage() {
   const environment = parsePublicEnvironment(process.env);
-  if (!environment.conversationAiEnabled) {
+  if (!environment.conversationAiEnabled || environment.demoSandboxEnabled) {
     notFound();
   }
   const receptionistSettings = await loadReceptionistSettings(

@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from insurance_operations.database.models import (
     Agency,
     AgencyApprovedFaq,
+    AgencyCallPolicy,
+    AgencyInboundNumber,
     AgencyMembership,
     AgencyReceptionistSettings,
     AppUser,
@@ -18,6 +20,8 @@ from insurance_operations.database.seed import (
     DEVELOPMENT_AGENCY_ID,
     DEVELOPMENT_AGENCY_SLUG,
     DEVELOPMENT_APPROVED_FAQ_IDS,
+    DEVELOPMENT_CALL_POLICY_ID,
+    DEVELOPMENT_INBOUND_NUMBER_ID,
     DEVELOPMENT_MEMBERSHIP_ID,
     DEVELOPMENT_RECEPTIONIST_SETTINGS_ID,
     seed_development_foundation,
@@ -36,6 +40,7 @@ EXPECTED_TABLES = {
     "idempotency_records",
     "conversation_sessions",
     "conversation_intakes",
+    "conversation_intake_confirmation_receipts",
     "agency_receptionist_settings",
     "agency_approved_faqs",
     "agency_leads",
@@ -144,6 +149,8 @@ EXPECTED_COLUMNS = {
         "id",
         "agency_id",
         "initiated_by",
+        "channel",
+        "inbound_call_id",
         "status",
         "provider_metadata",
         "disclosure_accepted_at",
@@ -169,6 +176,20 @@ EXPECTED_COLUMNS = {
         "confirmation_source",
         "intake_intent",
         "confirmed_transcript",
+        "confirmed_at",
+        "created_at",
+    },
+    "conversation_intake_confirmation_receipts": {
+        "id",
+        "agency_id",
+        "conversation_session_id",
+        "inbound_call_id",
+        "full_name",
+        "email",
+        "phone",
+        "intake_intent",
+        "urgency",
+        "request_fingerprint",
         "confirmed_at",
         "created_at",
     },
@@ -391,6 +412,7 @@ def test_migration_creates_only_the_documented_foundation_indexes(
         "ix_conversation_sessions_agency_authorized",
         "ix_conversation_sessions_agency_created",
         "ix_conversation_sessions_agency_status_expires",
+        "uq_conversation_sessions_inbound_call",
     }
     assert conversation_intake_indexes == {
         "ix_conversation_intakes_customer_confirmed",
@@ -445,8 +467,12 @@ def test_migration_unique_constraints_match_the_approved_scopes(
                 "idempotency_key",
             )
         },
-        "conversation_sessions": set(),
+        "conversation_sessions": {("inbound_call_id",)},
         "conversation_intakes": {("conversation_session_id",)},
+        "conversation_intake_confirmation_receipts": {
+            ("conversation_session_id",),
+            ("inbound_call_id",),
+        },
         "agency_receptionist_settings": {("agency_id",)},
         "agency_approved_faqs": {("agency_id", "normalized_question")},
         "agency_leads": {("conversation_intake_id",)},
@@ -506,6 +532,8 @@ def test_migration_check_constraints_cover_approved_invariants(
             "ck_conversation_sessions_status_valid",
             "ck_conversation_sessions_duration_valid",
             "ck_conversation_sessions_provider_metadata_object",
+            "ck_conversation_sessions_channel_valid",
+            "ck_conversation_sessions_channel_call_consistent",
             "ck_conversation_sessions_confirmed_at_consistent",
             "ck_conversation_sessions_row_version_positive",
         },
@@ -513,6 +541,13 @@ def test_migration_check_constraints_cover_approved_invariants(
             "ck_conversation_intakes_confirmation_source_valid",
             "ck_conversation_intakes_intake_intent_length_valid",
             "ck_conversation_intakes_transcript_array_valid",
+        },
+        "conversation_intake_confirmation_receipts": {
+            "ck_conversation_intake_confirmation_receipts_name_valid",
+            "ck_conversation_intake_confirmation_receipts_contact_required",
+            "ck_conversation_intake_confirmation_receipts_intent_valid",
+            "ck_conversation_intake_confirmation_receipts_urgency_valid",
+            "ck_conversation_intake_confirmation_receipts_fingerprint_valid",
         },
         "agency_receptionist_settings": {
             "ck_agency_receptionist_settings_public_name_length_valid",
@@ -741,6 +776,44 @@ def test_development_seed_is_idempotent(
     assert membership_count == 1
     assert seeded_agency.slug == DEVELOPMENT_AGENCY_SLUG
     assert seeded_agency.environment_kind == "DEVELOPMENT"
+
+
+def test_development_seed_configures_demo_telephony_idempotently(
+    migrated_database: Engine,
+    database_settings: DatabaseSettings,
+) -> None:
+    settings = DatabaseSettings.model_validate(
+        {
+            "app_environment": RuntimeEnvironment.DEVELOPMENT,
+            "database_url": database_settings.runtime_database_url,
+            "direct_database_url": None,
+            "test_database_url": None,
+            "database_ssl_mode": database_settings.database_ssl_mode,
+            "demo_inbound_number_e164": "+15550100100",
+            "demo_transfer_destination_e164": "+15550100200",
+        }
+    )
+
+    first_result = seed_development_foundation(settings)
+    second_result = seed_development_foundation(settings)
+
+    assert first_result.call_policy_configured is True
+    assert first_result.inbound_number_configured is True
+    assert second_result.call_policy_configured is False
+    assert second_result.inbound_number_configured is False
+
+    with Session(migrated_database) as session:
+        policy = session.get(AgencyCallPolicy, DEVELOPMENT_CALL_POLICY_ID)
+        number = session.get(AgencyInboundNumber, DEVELOPMENT_INBOUND_NUMBER_ID)
+
+    assert policy is not None
+    assert policy.transfer_destination_e164 == "+15550100200"
+    assert policy.max_concurrent_calls == 2
+    assert policy.daily_call_limit == 10
+    assert len(policy.availability_windows) == 7
+    assert number is not None
+    assert number.phone_number_e164 == "+15550100100"
+    assert number.status == "ACTIVE"
 
 
 @pytest.mark.parametrize(

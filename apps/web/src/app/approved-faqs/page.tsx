@@ -5,6 +5,8 @@ import { parsePublicEnvironment } from "@/lib/environment";
 
 export default function ApprovedFaqsPage() {
   const environment = parsePublicEnvironment(process.env);
-  if (!environment.conversationAiEnabled) notFound();
+  if (!environment.conversationAiEnabled || environment.demoSandboxEnabled) {
+    notFound();
+  }
   return <ApprovedFaqManager apiBaseUrl={environment.apiBaseUrl} />;
 }

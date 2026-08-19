@@ -10,6 +10,10 @@ EXPECTED_OWNERSHIP = {
     "customers": ("customers", "agency_id"),
     "conversation_sessions": ("conversations", "agency_id"),
     "conversation_intakes": ("conversations", "agency_id"),
+    "conversation_intake_confirmation_receipts": (
+        "conversations",
+        "agency_id",
+    ),
     "agency_receptionist_settings": ("receptionist", "agency_id"),
     "agency_approved_faqs": ("approved_faqs", "agency_id"),
     "agency_leads": ("leads", "agency_id"),
@@ -69,12 +73,18 @@ def test_foundation_relationships_match_available_parent_tables(
         "conversation_sessions": {
             (("agency_id",), "agencies"),
             (("initiated_by",), "app_users"),
+            (("inbound_call_id",), "inbound_calls"),
         },
         "conversation_intakes": {
             (("agency_id",), "agencies"),
             (("customer_id",), "customers"),
             (("conversation_session_id",), "conversation_sessions"),
             (("created_by",), "app_users"),
+        },
+        "conversation_intake_confirmation_receipts": {
+            (("agency_id",), "agencies"),
+            (("conversation_session_id",), "conversation_sessions"),
+            (("inbound_call_id",), "inbound_calls"),
         },
         "agency_receptionist_settings": {
             (("agency_id",), "agencies"),

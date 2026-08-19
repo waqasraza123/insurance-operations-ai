@@ -14,6 +14,8 @@ describe("parsePublicEnvironment", () => {
     ).toEqual({
       apiBaseUrl: "https://api.example.com",
       conversationAiEnabled: false,
+      demoSandboxEnabled: false,
+      demoPhoneNumber: null,
     });
   });
 
@@ -45,5 +47,30 @@ describe("parsePublicEnvironment", () => {
         NEXT_PUBLIC_CONVERSATION_AI_ENABLED: "yes",
       }),
     ).toThrow("NEXT_PUBLIC_CONVERSATION_AI_ENABLED must be true or false");
+  });
+
+  it("requires an E.164 number for the public demo sandbox", () => {
+    expect(() =>
+      parsePublicEnvironment({
+        NEXT_PUBLIC_API_BASE_URL: "https://api.example.com",
+        NEXT_PUBLIC_DEMO_SANDBOX_ENABLED: "true",
+        NEXT_PUBLIC_DEMO_PHONE_NUMBER: "555-0100",
+      }),
+    ).toThrow("NEXT_PUBLIC_DEMO_PHONE_NUMBER must use E.164 format");
+  });
+
+  it("parses the public phone demo configuration", () => {
+    expect(
+      parsePublicEnvironment({
+        NEXT_PUBLIC_API_BASE_URL: "https://api.example.com",
+        NEXT_PUBLIC_DEMO_SANDBOX_ENABLED: "true",
+        NEXT_PUBLIC_DEMO_PHONE_NUMBER: "+15550100100",
+      }),
+    ).toEqual({
+      apiBaseUrl: "https://api.example.com",
+      conversationAiEnabled: false,
+      demoSandboxEnabled: true,
+      demoPhoneNumber: "+15550100100",
+    });
   });
 });

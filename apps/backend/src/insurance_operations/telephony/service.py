@@ -536,6 +536,110 @@ class TelephonyService:
             directive.call = inbound_call_response(inbound_call)
             return directive
 
+    def apply_provider_event(
+        self,
+        *,
+        call_id: UUID,
+        request: InboundCallEventInput,
+        correlation_id: UUID,
+    ) -> InboundCallActionResponse:
+        with self._session_factory() as session, session.begin():
+            inbound_call = session.get(InboundCall, call_id, with_for_update=True)
+            if inbound_call is None:
+                raise ApiError(
+                    status_code=404,
+                    code="INBOUND_CALL_NOT_FOUND",
+                    message="The inbound call was not found",
+                )
+            existing_event = session.scalar(
+                select(InboundCallEvent).where(
+                    InboundCallEvent.inbound_call_id == inbound_call.id,
+                    InboundCallEvent.event_key == request.event_key,
+                )
+            )
+            if existing_event is not None:
+                if (
+                    existing_event.event_type != request.event_type.value
+                    or existing_event.details.get("failure_code")
+                    != request.failure_code
+                ):
+                    raise ApiError(
+                        status_code=409,
+                        code="INBOUND_CALL_EVENT_KEY_REUSED",
+                        message="The call event key was reused with different data",
+                    )
+                return replay_event_response(inbound_call, existing_event)
+            if request.occurred_at < inbound_call.received_at:
+                raise ApiError(
+                    status_code=409,
+                    code="INBOUND_CALL_EVENT_TIME_INVALID",
+                    message="The call event occurred before the call was received",
+                )
+
+            directive = transition_call(inbound_call, request)
+            session.flush()
+            session.refresh(inbound_call)
+            event_details: dict[str, object] = {
+                "action": directive.action.value,
+                "resulting_status": inbound_call.status,
+            }
+            if directive.message is not None:
+                event_details["message"] = directive.message
+            if request.failure_code is not None:
+                event_details["failure_code"] = request.failure_code
+            session.add(
+                InboundCallEvent(
+                    agency_id=inbound_call.agency_id,
+                    inbound_call_id=inbound_call.id,
+                    event_key=request.event_key,
+                    event_type=request.event_type.value,
+                    occurred_at=request.occurred_at,
+                    details=event_details,
+                )
+            )
+            session.add(
+                telephony_system_audit(
+                    agency_id=inbound_call.agency_id,
+                    event_type="INBOUND_CALL_STATE_CHANGED",
+                    summary="Inbound call state changed",
+                    details={
+                        "inbound_call_id": str(inbound_call.id),
+                        "event_type": request.event_type.value,
+                        "status": inbound_call.status,
+                    },
+                    correlation_id=correlation_id,
+                )
+            )
+            directive.call = inbound_call_response(inbound_call)
+            return directive
+
+    def apply_provider_event_by_reference(
+        self,
+        *,
+        adapter_name: str,
+        source_call_reference: str,
+        request: InboundCallEventInput,
+        correlation_id: UUID,
+    ) -> InboundCallActionResponse:
+        with self._session_factory() as session:
+            call_id = session.scalar(
+                select(InboundCall.id).where(
+                    InboundCall.adapter_name == adapter_name,
+                    InboundCall.source_call_reference == source_call_reference,
+                )
+            )
+        if call_id is None:
+            raise ApiError(
+                status_code=404,
+                code="INBOUND_CALL_NOT_FOUND",
+                message="The inbound call was not found",
+            )
+        return self.apply_provider_event(
+            call_id=call_id,
+            request=request,
+            correlation_id=correlation_id,
+        )
+
     def link_lead(
         self,
         *,
@@ -700,6 +804,29 @@ def transition_call(
             inbound_call,
             action=CallAction.CONTINUE_AI,
             message=message,
+        )
+    if event is InboundCallEventType.CALLBACK_REQUESTED:
+        require_call_status(current, event, {InboundCallStatus.CONNECTED.value})
+        if snapshot_bool(
+            inbound_call.policy_snapshot,
+            "callback_fallback_enabled",
+        ):
+            inbound_call.status = InboundCallStatus.CALLBACK_PENDING.value
+            return call_action_response(
+                inbound_call,
+                action=CallAction.COLLECT_CALLBACK,
+                message=snapshot_string(
+                    inbound_call.policy_snapshot,
+                    "unavailable_message",
+                ),
+            )
+        return call_action_response(
+            inbound_call,
+            action=CallAction.CONTINUE_AI,
+            message=snapshot_string(
+                inbound_call.policy_snapshot,
+                "unavailable_message",
+            ),
         )
     if event is InboundCallEventType.TRANSFER_SUCCEEDED:
         require_call_status(

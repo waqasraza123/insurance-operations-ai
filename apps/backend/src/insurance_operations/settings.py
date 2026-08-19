@@ -1,3 +1,4 @@
+import re
 from enum import StrEnum
 from typing import Self
 from urllib.parse import urlsplit
@@ -42,6 +43,8 @@ class DatabaseSettings(CommonSettings):
     database_max_overflow: int = Field(default=2, ge=0, le=20)
     database_pool_timeout_seconds: int = Field(default=10, ge=1, le=60)
     database_pool_recycle_seconds: int = Field(default=300, ge=30, le=3_600)
+    demo_inbound_number_e164: str | None = None
+    demo_transfer_destination_e164: str | None = None
 
     @field_validator(
         "database_url",
@@ -62,6 +65,19 @@ class DatabaseSettings(CommonSettings):
         if not parsed_url.database:
             raise ValueError("database URLs must include a database name")
         return value
+
+    @field_validator(
+        "demo_inbound_number_e164",
+        "demo_transfer_destination_e164",
+    )
+    @classmethod
+    def validate_demo_phone_number(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if re.fullmatch(r"\+[1-9][0-9]{7,14}", normalized) is None:
+            raise ValueError("demo phone numbers must use E.164 format")
+        return normalized
 
     @model_validator(mode="after")
     def validate_database_environment(self) -> Self:
@@ -118,6 +134,9 @@ class ApiSettings(DatabaseSettings):
     elevenlabs_api_key: SecretStr | None = None
     elevenlabs_agent_id: str | None = Field(default=None, min_length=1, max_length=200)
     elevenlabs_privacy_confirmed: bool = False
+    demo_sandbox_enabled: bool = False
+    demo_admin_token: SecretStr | None = None
+    demo_result_ttl_minutes: int = Field(default=15, ge=5, le=60)
 
     @field_validator("web_origin")
     @classmethod
@@ -152,6 +171,16 @@ class ApiSettings(DatabaseSettings):
             return None
         return SecretStr(value.get_secret_value().strip())
 
+    @field_validator("demo_admin_token")
+    @classmethod
+    def normalize_demo_admin_token(
+        cls,
+        value: SecretStr | None,
+    ) -> SecretStr | None:
+        if value is None:
+            return None
+        return SecretStr(value.get_secret_value().strip())
+
     @model_validator(mode="after")
     def validate_conversation_configuration(self) -> Self:
         if not self.conversation_ai_enabled:
@@ -176,6 +205,31 @@ class ApiSettings(DatabaseSettings):
         if not self.elevenlabs_privacy_confirmed:
             raise ValueError(
                 "ElevenLabs audio saving and zero-day retention must be confirmed"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_demo_sandbox_configuration(self) -> Self:
+        if not self.demo_sandbox_enabled:
+            return self
+        if self.app_environment is not RuntimeEnvironment.DEVELOPMENT:
+            raise ValueError("the demo sandbox can be enabled only in development")
+        if self.development_actor_user_id is None:
+            raise ValueError(
+                "DEVELOPMENT_ACTOR_USER_ID is required for the demo sandbox"
+            )
+        if (
+            self.demo_admin_token is None
+            or len(self.demo_admin_token.get_secret_value()) < 32
+        ):
+            raise ValueError("DEMO_ADMIN_TOKEN must contain at least 32 characters")
+        if self.demo_inbound_number_e164 is None:
+            raise ValueError(
+                "DEMO_INBOUND_NUMBER_E164 is required for the demo sandbox"
+            )
+        if self.demo_transfer_destination_e164 is None:
+            raise ValueError(
+                "DEMO_TRANSFER_DESTINATION_E164 is required for the demo sandbox"
             )
         return self
 

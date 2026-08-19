@@ -9,23 +9,37 @@ export default async function Home() {
   const environment = parsePublicEnvironment(process.env);
   const [backendStatus, receptionistSettings] = await Promise.all([
     getBackendStatus(),
-    loadReceptionistSettings(environment.apiBaseUrl),
+    environment.demoSandboxEnabled
+      ? Promise.resolve(undefined)
+      : loadReceptionistSettings(environment.apiBaseUrl),
   ]);
   const agencyName =
-    receptionistSettings?.publicName ?? "Your insurance agency";
+    receptionistSettings?.publicName ??
+    (environment.demoSandboxEnabled
+      ? "Harborline Insurance"
+      : "Your insurance agency");
 
   return (
     <main className="site-shell">
       <nav className="top-nav" aria-label="Primary navigation">
         <span className="brand-link">Insurance Operations AI</span>
-        {environment.conversationAiEnabled && (
+        {(environment.conversationAiEnabled ||
+          environment.demoSandboxEnabled) && (
           <div className="nav-links">
-            <Link className="text-link" href="/receptionist-settings">
-              Agency profile
-            </Link>
-            <Link className="text-link" href="/approved-faqs">
-              Approved FAQs
-            </Link>
+            {environment.demoSandboxEnabled ? (
+              <Link className="text-link" href="/phone-demo">
+                Phone demo
+              </Link>
+            ) : (
+              <>
+                <Link className="text-link" href="/receptionist-settings">
+                  Agency profile
+                </Link>
+                <Link className="text-link" href="/approved-faqs">
+                  Approved FAQs
+                </Link>
+              </>
+            )}
           </div>
         )}
       </nav>
@@ -40,7 +54,11 @@ export default async function Home() {
             and routes licensed work to your team.
           </p>
           <div className="hero-actions">
-            {environment.conversationAiEnabled ? (
+            {environment.demoSandboxEnabled ? (
+              <Link className="primary-link" href="/phone-demo">
+                Call the phone agent
+              </Link>
+            ) : environment.conversationAiEnabled ? (
               <Link className="primary-link" href="/voice-test">
                 Talk to the receptionist
               </Link>
@@ -61,7 +79,10 @@ export default async function Home() {
 
         <aside className="receptionist-preview" aria-label="Configured agency">
           <div className="preview-status">
-            <span className="status-dot" /> Browser receptionist configured
+            <span className="status-dot" />{" "}
+            {environment.demoSandboxEnabled
+              ? "Phone receptionist ready"
+              : "Browser receptionist configured"}
           </div>
           <p className="preview-label">Now representing</p>
           <h2>{agencyName}</h2>

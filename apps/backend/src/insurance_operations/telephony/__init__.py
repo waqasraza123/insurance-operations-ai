@@ -3,6 +3,7 @@ from insurance_operations.telephony.contracts import (
     TelephonyAdapterError,
     TransferInstruction,
     VerifiedInboundCall,
+    VerifiedTransferResult,
 )
 from insurance_operations.telephony.schemas import (
     CallPolicyInput,
@@ -36,4 +37,5 @@ __all__ = [
     "TelephonyService",
     "TransferInstruction",
     "VerifiedInboundCall",
+    "VerifiedTransferResult",
 ]

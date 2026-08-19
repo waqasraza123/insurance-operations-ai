@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: insurance-voice-demo-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install .
+    startCommand: uvicorn insurance_operations.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: APP_ENVIRONMENT
+        value: development
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: 10000
+      - key: WEB_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_MODE
+        value: require
+      - key: DEVELOPMENT_ACTOR_USER_ID
+        value: 00000000-0000-4000-8000-000000000002
+      - key: CONVERSATION_AI_ENABLED
+        value: false
+      - key: DEMO_SANDBOX_ENABLED
+        value: true
+      - key: DEMO_ADMIN_TOKEN
+        sync: false
+      - key: DEMO_INBOUND_NUMBER_E164
+        sync: false
+      - key: DEMO_TRANSFER_DESTINATION_E164
+        sync: false
+      - key: DEMO_RESULT_TTL_MINUTES
+        value: 15
+      - key: TELEPHONY_PROVIDER_ENABLED
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_INBOUND_WEBHOOK_URL
+        sync: false
+      - key: TWILIO_TRANSFER_CALLBACK_URL
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_PHONE_AGENT_ID
+        sync: false
+      - key: ELEVENLABS_PHONE_TOOL_SECRET
+        sync: false
+      - key: ELEVENLABS_POST_CALL_WEBHOOK_SECRET
+        sync: false
+      - key: ELEVENLABS_PRIVACY_CONFIRMED
+        sync: false
+      - key: PHONE_MAX_DURATION_SECONDS
+        value: 180
+      - key: PHONE_CONFIRMATION_WINDOW_MINUTES
+        value: 30

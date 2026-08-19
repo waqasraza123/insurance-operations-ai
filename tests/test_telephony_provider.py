@@ -19,6 +19,9 @@ ACCOUNT_SID = "AC" + ("a" * 32)
 CALL_SID = "CA" + ("b" * 32)
 AUTH_TOKEN = "synthetic-twilio-auth-token"
 WEBHOOK_URL = "https://voice.example.test/api/v1/providers/twilio/inbound"
+TRANSFER_CALLBACK_URL = (
+    "https://voice.example.test/api/v1/providers/twilio/transfer-result"
+)
 
 
 class FakeCallUpdater:
@@ -33,11 +36,13 @@ class FakeCallUpdater:
 
 def signed_webhook(
     parameters: dict[str, str],
+    *,
+    url: str = WEBHOOK_URL,
 ) -> tuple[dict[str, str], bytes]:
     body = urlencode(parameters).encode()
 
     signature = RequestValidator(AUTH_TOKEN).compute_signature(
-        WEBHOOK_URL,
+        url,
         parameters,
     )
 
@@ -66,6 +71,7 @@ def test_twilio_adapter_verifies_and_normalizes_inbound_call() -> None:
         account_sid=ACCOUNT_SID,
         auth_token=AUTH_TOKEN,
         inbound_webhook_url=WEBHOOK_URL,
+        transfer_callback_url=TRANSFER_CALLBACK_URL,
         clock=lambda: occurred_at,
     )
 
@@ -168,6 +174,7 @@ def test_twilio_adapter_maps_transfer_to_active_call_update() -> None:
         account_sid=ACCOUNT_SID,
         auth_token=AUTH_TOKEN,
         inbound_webhook_url=WEBHOOK_URL,
+        transfer_callback_url=TRANSFER_CALLBACK_URL,
         call_updater=updater,
     )
 
@@ -183,6 +190,34 @@ def test_twilio_adapter_maps_transfer_to_active_call_update() -> None:
     assert updater.twiml is not None
     assert "+15550100300" in updater.twiml
     assert "25" in updater.twiml
+    assert TRANSFER_CALLBACK_URL in updater.twiml
+
+
+def test_twilio_adapter_verifies_transfer_result() -> None:
+    occurred_at = datetime(2026, 8, 11, 12, 3, tzinfo=UTC)
+    dial_call_sid = "CA" + ("d" * 32)
+    parameters = {
+        "AccountSid": ACCOUNT_SID,
+        "CallSid": CALL_SID,
+        "DialCallSid": dial_call_sid,
+        "DialCallStatus": "no-answer",
+    }
+    headers, body = signed_webhook(parameters, url=TRANSFER_CALLBACK_URL)
+    adapter = TwilioTelephonyAdapter(
+        account_sid=ACCOUNT_SID,
+        auth_token=AUTH_TOKEN,
+        inbound_webhook_url=WEBHOOK_URL,
+        transfer_callback_url=TRANSFER_CALLBACK_URL,
+        clock=lambda: occurred_at,
+    )
+
+    result = adapter.verify_transfer_callback(headers=headers, body=body)
+
+    assert result.adapter_name == "twilio"
+    assert result.source_call_reference == CALL_SID
+    assert result.succeeded is False
+    assert result.failure_code == "TRANSFER_NO_ANSWER"
+    assert result.occurred_at == occurred_at
 
 
 def test_disabled_provider_accepts_blank_environment_values() -> None:
