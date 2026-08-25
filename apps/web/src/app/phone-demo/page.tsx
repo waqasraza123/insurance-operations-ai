@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { PhoneDemoBoard } from "@/features/phone-demo/phone-demo-board";
-import { parsePublicEnvironment } from "@/lib/environment";
+import {
+  parseDemoPhoneNumber,
+  parsePublicEnvironment,
+} from "@/lib/environment";
 
 export const metadata: Metadata = {
   title: "Phone Agent Demo | Insurance Operations AI",
@@ -12,13 +15,14 @@ export const metadata: Metadata = {
 
 export default function PhoneDemoPage() {
   const environment = parsePublicEnvironment(process.env);
-  if (!environment.demoSandboxEnabled || environment.demoPhoneNumber === null) {
+  if (!environment.demoSandboxEnabled) {
     notFound();
   }
+  const phoneNumber = parseDemoPhoneNumber(process.env);
   return (
     <PhoneDemoBoard
       apiBaseUrl={environment.apiBaseUrl}
-      phoneNumber={environment.demoPhoneNumber}
+      phoneNumber={phoneNumber}
     />
   );
 }

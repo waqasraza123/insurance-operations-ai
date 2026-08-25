@@ -2,7 +2,6 @@ export type PublicEnvironment = Readonly<{
   apiBaseUrl: string;
   conversationAiEnabled: boolean;
   demoSandboxEnabled: boolean;
-  demoPhoneNumber: string | null;
 }>;
 
 export class EnvironmentValidationError extends Error {
@@ -49,22 +48,23 @@ export function parsePublicEnvironment(
     values.NEXT_PUBLIC_DEMO_SANDBOX_ENABLED?.trim().toLowerCase() ?? "false",
     "NEXT_PUBLIC_DEMO_SANDBOX_ENABLED",
   );
-  const demoPhoneNumber = values.NEXT_PUBLIC_DEMO_PHONE_NUMBER?.trim() || null;
-  if (
-    demoSandboxEnabled &&
-    (demoPhoneNumber === null || !/^\+[1-9][0-9]{7,14}$/.test(demoPhoneNumber))
-  ) {
-    throw new EnvironmentValidationError(
-      "NEXT_PUBLIC_DEMO_PHONE_NUMBER must use E.164 format in demo sandbox mode",
-    );
-  }
-
   return {
     apiBaseUrl: apiUrl.toString().replace(/\/$/, ""),
     conversationAiEnabled,
     demoSandboxEnabled,
-    demoPhoneNumber,
   };
+}
+
+export function parseDemoPhoneNumber(
+  values: Readonly<Record<string, string | undefined>>,
+): string {
+  const demoPhoneNumber = values.NEXT_PUBLIC_DEMO_PHONE_NUMBER?.trim();
+  if (!demoPhoneNumber || !/^\+[1-9][0-9]{7,14}$/.test(demoPhoneNumber)) {
+    throw new EnvironmentValidationError(
+      "NEXT_PUBLIC_DEMO_PHONE_NUMBER must use E.164 format in demo sandbox mode",
+    );
+  }
+  return demoPhoneNumber;
 }
 
 function parseBoolean(value: string, name: string): boolean {
