@@ -8,6 +8,17 @@ CoverOps combines a **Next.js frontend**, **FastAPI backend**, **PostgreSQL**,
 **ElevenLabs Voice AI**, and **Twilio telephony** behind provider-neutral
 application services.
 
+<p align="center">
+  <sub>VOICE AI POWERED BY</sub><br><br>
+  <a href="https://elevenlabs.io/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://11labs-nonprd-15f22c1d.s3.eu-west-3.amazonaws.com/0b9cd3e1-9fad-4a5b-b3a0-c96b0a1f1d2b/elevenlabs-logo-white.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://11labs-nonprd-15f22c1d.s3.eu-west-3.amazonaws.com/0b9cd3e1-9fad-4a5b-b3a0-c96b0a1f1d2b/elevenlabs-logo-black.svg">
+      <img alt="ElevenLabs" src="https://11labs-nonprd-15f22c1d.s3.eu-west-3.amazonaws.com/0b9cd3e1-9fad-4a5b-b3a0-c96b0a1f1d2b/elevenlabs-logo-black.svg" width="260">
+    </picture>
+  </a>
+</p>
+
 > **Important:** CoverOps is a starter architecture and synthetic-data
 > demonstration. It is not a production-ready insurance SaaS and must not be
 > used with real customer data without completing the production work described
