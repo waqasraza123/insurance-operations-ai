@@ -8,7 +8,7 @@ import {
 } from "@/lib/environment";
 
 export const metadata: Metadata = {
-  title: "Phone Agent Demo | Insurance Operations AI",
+  title: "Phone Agent Demo | CoverOps",
   description: "A fictional-data demonstration of an AI insurance front desk.",
   robots: { index: false, follow: false },
 };

@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Insurance Operations AI Receptionist",
+  title: "CoverOps — Insurance Voice AI SaaS Starter Kit",
   description:
-    "A guarded AI front desk for insurance agency intake and human follow-up.",
+    "A Next.js and FastAPI starter for guarded browser and phone Voice AI, approved FAQs, confirmed lead intake, and human handoff.",
 };
 
 type RootLayoutProperties = Readonly<{

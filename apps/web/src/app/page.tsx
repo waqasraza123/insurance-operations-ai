@@ -47,12 +47,12 @@ export default async function Home() {
 
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <p className="eyebrow">AI front desk for independent agencies</p>
-          <h1 id="hero-title">Every new inquiry gets a clear next step.</h1>
+          <p className="eyebrow">Insurance Voice AI SaaS starter kit</p>
+          <h1 id="hero-title">Build a guarded AI front desk for insurance agencies.</h1>
           <p className="summary hero-summary">
-            A real-time AI receptionist that welcomes prospects, handles
-            agency-approved questions, captures structured insurance interest,
-            and routes licensed work to your team.
+            A development-ready Next.js and FastAPI foundation for browser and
+            phone agents, approved agency answers, confirmed lead intake, and
+            human handoff.
           </p>
           <div className="hero-actions">
             {environment.demoSandboxEnabled ? (
@@ -73,7 +73,7 @@ export default async function Home() {
             </a>
           </div>
           <p className="demo-notice">
-            Development showcase · fictional information only · no quotes,
+            Starter-kit showcase · fictional information only · no quotes,
             advice, binding, or coverage decisions
           </p>
         </div>

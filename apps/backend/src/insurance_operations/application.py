@@ -147,7 +147,7 @@ def create_app(
         database_engine.dispose()
 
     application = FastAPI(
-        title="Insurance Operations AI API",
+        title="CoverOps API",
         version="0.1.0",
         docs_url=None,
         redoc_url=None,

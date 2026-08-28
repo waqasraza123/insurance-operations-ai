@@ -1,98 +1,321 @@
-# Insurance Operations AI
+# CoverOps — Insurance Voice AI SaaS Starter Kit
 
-Next.js frontend, FastAPI API, separate Python worker, and shared Neon PostgreSQL persistence. The active product slice provides an agency-configurable, synthetic AI receptionist with consent-gated browser voice, explicit review, and audited intake confirmation.
+A development-ready foundation for building an insurance agency Voice AI SaaS
+with browser and telephone agents, approved knowledge, confirmed lead intake,
+and human handoff.
 
-## Setup
+CoverOps combines a **Next.js frontend**, **FastAPI backend**, **PostgreSQL**,
+**ElevenLabs Voice AI**, and **Twilio telephony** behind provider-neutral
+application services.
 
-Requires Node.js 26 and Python 3.13.
+> **Important:** CoverOps is a starter architecture and synthetic-data
+> demonstration. It is not a production-ready insurance SaaS and must not be
+> used with real customer data without completing the production work described
+> below.
+
+## What ships
+
+The current starter foundation includes:
+
+- Browser Voice AI using authenticated ElevenLabs WebRTC.
+- Inbound telephone AI through Twilio and a separate ElevenLabs phone agent.
+- Agency-approved FAQ retrieval with source references.
+- AI disclosure and consent gates.
+- Structured insurance-interest intake.
+- Explicit browser review and confirmation.
+- Explicit verbal phone readback confirmation.
+- Transactional customer, confirmed intake, and lead creation.
+- Callback and live-transfer handoff foundations.
+- Provider-neutral application state.
+- Agency ownership foundations.
+- Audit records and idempotency protections.
+- Conversation and call quotas.
+- Alembic-managed PostgreSQL migrations.
+- Synthetic Harborline Insurance demo data.
+
+## What you still add before production
+
+This repository intentionally does not claim to be a finished production SaaS.
+
+A production implementation still requires:
+
+- Production authentication and agency onboarding.
+- Roles and permissions.
+- Billing, plans, and entitlements.
+- Final lead and operations dashboards.
+- Durable notification delivery.
+- CRM and agency-management-system integrations.
+- Usage and cost metering.
+- Retention, export, and deletion workflows.
+- Production observability and incident response.
+- Deployment and operational hardening.
+- Security, privacy, regulatory, and compliance review for the intended use.
+
+## Safety boundaries
+
+The receptionist is designed as a front-desk assistant.
+
+It must not:
+
+- quote insurance
+- recommend coverage
+- choose limits
+- bind coverage
+- verify coverage
+- make underwriting decisions
+- make claims decisions
+- improvise answers outside approved agency knowledge
+
+Unsupported or regulated requests should be handed to agency staff.
+
+Raw audio is not retained by the application.
+
+## Demo identity
+
+**CoverOps** is the starter-kit product.
+
+**Harborline Insurance** is the fictional agency used in demonstrations and
+seed data.
+
+The internal Python namespace remains `insurance_operations` to avoid
+unnecessary code and migration churn.
+
+See [branding](docs/branding.md).
+
+## Architecture
+
+```text
+Browser
+   |
+   | WebRTC
+   v
+ElevenLabs Voice AI
+   |
+   | approved application tools
+   v
+FastAPI ---------------- PostgreSQL
+   |
+   +---- FAQ / intake / lead / handoff services
+
+
+Telephone caller
+   |
+   v
+Twilio
+   |
+   v
+ElevenLabs phone agent
+   |
+   | authenticated tools + signed callbacks
+   v
+FastAPI ---------------- PostgreSQL
+```
+
+FastAPI remains authoritative for business rules, ownership, validation,
+confirmation, idempotency, quotas, audit records, and persistence.
+
+Provider-specific behavior remains isolated inside adapters.
+
+## Technology stack
+
+### Web
+
+- Next.js
+- React
+- TypeScript
+- ElevenLabs React SDK
+
+### Backend
+
+- Python 3.13
+- FastAPI
+- SQLAlchemy 2
+- Pydantic
+- Alembic
+
+### Data
+
+- PostgreSQL
+- Neon
+
+### Voice and telephony
+
+- ElevenLabs Voice AI
+- WebRTC
+- Twilio Voice
+
+## Quickstart
+
+Requirements:
+
+- Node.js 26
+- Python 3.13
+- PostgreSQL-compatible Neon development database
+
+Create local environment files:
 
 ```bash
 cp .env.example .env
 cp apps/web/.env.example apps/web/.env
-set -a
-source .env
-set +a
-npm install --package-lock-only --ignore-scripts --workspace @insurance-operations/web
+```
+
+Install dependencies:
+
+```bash
 npm ci
+
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-Use a Neon pooled URL for `DATABASE_URL`, a direct URL for `DIRECT_DATABASE_URL`, and a separate disposable database for `TEST_DATABASE_URL`. Never commit `.env` or a connection string. See [database setup](docs/database-setup.md).
+Load backend environment variables:
 
-## Development Database
+```bash
+set -a
+source .env
+set +a
+```
+
+Apply the development database:
 
 ```bash
 alembic upgrade head
 insurance-operations-seed-development
 ```
 
-The idempotent seed creates one development agency, deterministic synthetic actor, active membership, and synthetic receptionist profile. It refuses test and production environments.
+The seed creates the fictional Harborline Insurance agency and deterministic
+development records.
 
-## Voice AI Configuration
+Never use real customer information in the development environment.
 
-Follow [the agent setup contract](docs/elevenlabs-agent-setup.md), then set the server-only `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, and privacy attestation in the repository-root `.env`. Enable the backend feature flag only for development:
+## Run locally
 
-Keep both feature flags `false` until the owner completes the provider privacy and billing checklist. The owner must explicitly select the LLM, STT, TTS, and voice in ElevenLabs; the application does not silently select substitutes.
-
-```dotenv
-APP_ENVIRONMENT=development
-CONVERSATION_AI_ENABLED=true
-ELEVENLABS_PRIVACY_CONFIRMED=true
-```
-
-Inbound phone development uses a separate ElevenLabs phone agent behind Twilio.
-Keep it disabled until the dedicated
-[phone-agent](docs/elevenlabs-phone-agent-setup.md) and
-[telephony-provider](docs/telephony-provider-setup.md) checklists are complete.
-For the hosted fictional-data sales sandbox, follow the
-[client phone demo runbook](docs/client-phone-demo-runbook.md).
-
-Enable the public feature flag separately in `apps/web/.env`:
-
-```dotenv
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_CONVERSATION_AI_ENABLED=true
-```
-
-Do not use real customer data. The browser receives only a short-lived WebRTC token, never the API key.
-
-## Run
-
-Use separate configured shells:
+Start the web application:
 
 ```bash
 npm run dev:web
 ```
 
+Start FastAPI in another configured shell:
+
 ```bash
-uvicorn insurance_operations.api:app --host "$API_HOST" --port "$API_PORT" --reload
+source .venv/bin/activate
+set -a
+source .env
+set +a
+
+uvicorn insurance_operations.api:app \
+  --host "$API_HOST" \
+  --port "$API_PORT" \
+  --reload
 ```
+
+Start the worker separately when required:
 
 ```bash
 insurance-operations-worker
 ```
 
-Open `http://localhost:3000`. Use **Configure receptionist** to review the seeded agency profile, then select **Talk to the receptionist**. Accept all three acknowledgements, speak with the assistant, finish within three minutes, edit the transcript/details, then confirm. Only confirmation persists the transcript and creates a customer.
+Open:
 
-## Verify
+```text
+http://localhost:3000
+```
 
-The web workspace loads public values from `apps/web/.env`; backend and worker commands load the repository-root `.env`. Confirm `TEST_DATABASE_URL` points only to an isolated disposable database before the downgrade:
+## Setup tracks
+
+### Foundation only
+
+Keep Voice AI and telephone features disabled.
+
+This lets you inspect the frontend, backend, database model, agency
+configuration, FAQ system, lead foundations, and application architecture
+without configuring a voice provider.
+
+### Browser Voice AI
+
+Follow:
+
+[ElevenLabs browser agent setup](docs/elevenlabs-agent-setup.md)
+
+The browser receives a short-lived WebRTC credential from FastAPI. The
+ElevenLabs API key remains server-side.
+
+### Inbound telephone AI
+
+Follow:
+
+- [ElevenLabs phone agent setup](docs/elevenlabs-phone-agent-setup.md)
+- [Telephony provider setup](docs/telephony-provider-setup.md)
+- [Client phone demo runbook](docs/client-phone-demo-runbook.md)
+
+Telephone mode uses a separate ElevenLabs phone agent while Twilio retains
+carrier and transfer responsibility.
+
+Do not advertise the telephone demo as live until the provider dashboard and
+synthetic carrier-call checklist have been completed.
+
+## Environment configuration
+
+The root `.env` contains backend, database, provider, and secret configuration.
+
+`apps/web/.env` contains only browser-safe `NEXT_PUBLIC_*` configuration.
+
+Never expose:
+
+- database credentials
+- ElevenLabs API keys
+- Twilio credentials
+- provider webhook secrets
+- demo administrator secrets
+
+Never commit `.env` files.
+
+See [database setup](docs/database-setup.md).
+
+## Verification
+
+Before running database tests, confirm that `TEST_DATABASE_URL` points to a
+separate disposable database.
 
 ```bash
 npm run verify:web
+
 ruff format --check .
 ruff check .
 mypy apps/backend/src tests
-APP_ENVIRONMENT=test alembic downgrade base
+
 APP_ENVIRONMENT=test alembic upgrade head
 APP_ENVIRONMENT=test alembic current
 APP_ENVIRONMENT=test alembic check
 APP_ENVIRONMENT=test pytest
+
 insurance-operations-worker --check
 ```
 
-Manual QA: verify disabled flags hide the route; deny microphone permission; force a disconnect while connecting and while active; confirm the ending state prevents retry until cleanup finishes; observe the 3:00 countdown; test mute/unmute; confirm the 11th daily authorization is rejected with clear guidance; retry one transient confirmation with the same idempotency key; confirm an expired session requires a new conversation; inspect that no raw audio or draft transcript exists in PostgreSQL or logs; and verify provider audio saving/retention settings in the dashboard.
+Database downgrade or rebuild operations must only be run against a database
+that has been explicitly confirmed as disposable.
 
-Follow the [AI receptionist product plan](docs/ai-receptionist-product-plan.md). Read `AGENTS.md` and `docs/project-state.md` before changing architecture or scope.
+## Current limitations
+
+Production authentication, billing, real-customer-data operation, final
+operations UI, durable notifications, CRM integrations, detailed usage
+metering, retention/deletion workflows, and full production hardening remain
+outside the current starter foundation.
+
+The hosted and local demonstrations are intended for fictional data only.
+
+## Project documentation
+
+- [Brand identity](docs/branding.md)
+- [Database setup](docs/database-setup.md)
+- [Browser Voice AI setup](docs/elevenlabs-agent-setup.md)
+- [Phone agent setup](docs/elevenlabs-phone-agent-setup.md)
+- [Telephony provider setup](docs/telephony-provider-setup.md)
+- [Lead and handoff API](docs/lead-handoff-api.md)
+- [Client phone demo runbook](docs/client-phone-demo-runbook.md)
+
+Additional architecture, customization, deployment, demo, and
+production-readiness documentation will be added as part of the starter-kit
+presentation pass.

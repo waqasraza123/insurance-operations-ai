@@ -4,7 +4,7 @@ import Link from "next/link";
 export function Brand() {
   return (
     <Link
-      aria-label="Insurance Operations AI home"
+      aria-label="CoverOps home"
       className="brand-link"
       href="/"
     >
@@ -16,7 +16,7 @@ export function Brand() {
         src="/brand-mark.png"
         width={32}
       />
-      <span>Insurance Operations AI</span>
+      <span>CoverOps</span>
     </Link>
   );
 }
