@@ -80,7 +80,7 @@ seed data.
 The internal Python namespace remains `insurance_operations` to avoid
 unnecessary code and migration churn.
 
-See [branding](docs/branding.md).
+See the [branding guide](docs/branding.md).
 
 ## Architecture
 
